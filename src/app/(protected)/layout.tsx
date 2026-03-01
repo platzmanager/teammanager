@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { GenderNav } from "@/components/gender-nav";
+import { UserMenu } from "@/components/user-menu";
 import { createClient } from "@/lib/supabase/server";
-import { getUserProfile } from "@/lib/auth";
+import { getUserProfile, getUserGenders } from "@/lib/auth";
 import Link from "next/link";
 
 export default async function ProtectedLayout({
@@ -20,6 +21,7 @@ export default async function ProtectedLayout({
 
 	const profile = await getUserProfile();
 	const isAdmin = profile?.role === "admin";
+	const allowedGenders = profile ? getUserGenders(profile) : [];
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -27,7 +29,7 @@ export default async function ProtectedLayout({
 				<div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
 					<h1 className="text-lg font-bold">TC Thalkirchen</h1>
 					<div className="flex items-center gap-4">
-						<GenderNav />
+						<GenderNav allowedGenders={allowedGenders} />
 						{isAdmin && (
 							<nav className="flex gap-1">
 								<Link
@@ -44,14 +46,11 @@ export default async function ProtectedLayout({
 								</Link>
 							</nav>
 						)}
-						<form action="/api/logout" method="POST">
-							<button
-								type="submit"
-								className="text-sm text-muted-foreground hover:text-foreground"
-							>
-								Abmelden
-							</button>
-						</form>
+						<UserMenu
+							email={user.email ?? ""}
+							role={profile?.role ?? "player"}
+							teams={profile?.teams ?? []}
+						/>
 					</div>
 				</div>
 			</header>

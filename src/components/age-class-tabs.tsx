@@ -1,33 +1,44 @@
 "use client";
 
-import { useId } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AgeClass } from "@/lib/types";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { AgeClass, Gender } from "@/lib/types";
 
 interface AgeClassTabsProps {
-  value: AgeClass;
-  onChange: (value: AgeClass) => void;
+  gender: Gender;
+  current: AgeClass;
+  allowed: AgeClass[];
 }
 
-const ageClasses: { value: AgeClass; label: string }[] = [
-  { value: "offen", label: "Offen" },
-  { value: "30", label: "30" },
-  { value: "40", label: "40" },
-  { value: "50", label: "50" },
-  { value: "60", label: "60" },
-];
+const ageClassLabels: Record<AgeClass, string> = {
+  offen: "Alle",
+  "30": "30",
+  "40": "40",
+  "50": "50",
+  "60": "60",
+};
 
-export function AgeClassTabs({ value, onChange }: AgeClassTabsProps) {
-  const id = useId();
+function ageClassToUrl(ac: AgeClass): string {
+  return ac === "offen" ? "all" : ac;
+}
+
+export function AgeClassTabs({ gender, current, allowed }: AgeClassTabsProps) {
   return (
-    <Tabs id={id} value={value} onValueChange={(v) => onChange(v as AgeClass)}>
-      <TabsList>
-        {ageClasses.map((ac) => (
-          <TabsTrigger key={ac.value} value={ac.value}>
-            {ac.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+    <div className="inline-flex items-center rounded-lg bg-muted p-1">
+      {allowed.map((ac) => (
+        <Link
+          key={ac}
+          href={`/${gender}/${ageClassToUrl(ac)}`}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            current === ac
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {ageClassLabels[ac]}
+        </Link>
+      ))}
+    </div>
   );
 }

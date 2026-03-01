@@ -20,16 +20,18 @@ interface PlayerFormProps {
   player?: Player;
   trigger?: React.ReactNode;
   onDone?: () => void;
+  isAdmin?: boolean;
 }
 
-export function PlayerForm({ gender, player, trigger, onDone }: PlayerFormProps) {
+export function PlayerForm({ gender, player, trigger, onDone, isAdmin = false }: PlayerFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedGender, setSelectedGender] = useState<Gender>(player?.gender ?? gender);
   const isEdit = !!player;
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
-    formData.set("gender", gender);
+    formData.set("gender", isAdmin ? selectedGender : gender);
     if (player) formData.set("uuid", player.uuid);
 
     try {
@@ -59,6 +61,20 @@ export function PlayerForm({ gender, player, trigger, onDone }: PlayerFormProps)
           </DialogTitle>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
+          {isAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="gender">Geschlecht</Label>
+              <select
+                id="gender"
+                value={selectedGender}
+                onChange={(e) => setSelectedGender(e.target.value as Gender)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="female">Damen</option>
+                <option value="male">Herren</option>
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Vorname</Label>
@@ -109,6 +125,13 @@ export function PlayerForm({ gender, player, trigger, onDone }: PlayerFormProps)
               id="license"
               name="license"
               defaultValue={player?.license ?? ""}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              onKeyDown={(e) => {
+                if (!/[0-9]/.test(e.key) && !["Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End"].includes(e.key) && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                }
+              }}
             />
           </div>
           <div className="space-y-2">

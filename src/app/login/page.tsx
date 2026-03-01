@@ -31,7 +31,7 @@ export default function LoginPage() {
 			return;
 		}
 
-		router.push("/damen");
+		router.push("/female");
 		router.refresh();
 	}
 

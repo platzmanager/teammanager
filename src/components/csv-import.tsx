@@ -84,7 +84,7 @@ export function CsvImport() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [mapping, setMapping] = useState<MappingState>({ ...EMPTY_MAPPING });
-  const [gender, setGender] = useState<Gender>("herren");
+  const [gender, setGender] = useState<Gender>("male");
   const [hasHeader, setHasHeader] = useState(true);
   const [deleteMode, setDeleteMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -253,8 +253,8 @@ export function CsvImport() {
               onChange={(e) => setGender(e.target.value as Gender)}
               className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="herren">Herren</option>
-              <option value="damen">Damen</option>
+              <option value="male">Herren</option>
+              <option value="female">Damen</option>
             </select>
           </div>
           <div className="flex items-center gap-2 pt-6">

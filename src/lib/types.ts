@@ -1,6 +1,11 @@
-export type Gender = "damen" | "herren";
+export type Gender = "male" | "female";
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  female: "Damen",
+  male: "Herren",
+};
 export type AgeClass = "offen" | "30" | "40" | "50" | "60";
-export type UserRole = "admin" | "captain";
+export type UserRole = "admin" | "captain" | "player";
 
 export interface Player {
   uuid: string;
@@ -46,5 +51,7 @@ export interface UserProfile {
   role: UserRole;
   team_id: string | null;
   team?: Team | null;
+  player_uuid?: string | null;
+  teams?: Team[];
   created_at: string;
 }

@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
     if (user) {
       // Already logged in, redirect to app
       const url = request.nextUrl.clone();
-      url.pathname = "/damen";
+      url.pathname = "/female";
       return NextResponse.redirect(url);
     }
     return supabaseResponse;

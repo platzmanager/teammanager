@@ -137,6 +137,7 @@ export function SortableRow({
               gender={gender}
               player={player}
               onDone={onRefresh}
+              isAdmin={isAdmin}
               trigger={
                 <Button variant="ghost" size="sm">
                   ✎

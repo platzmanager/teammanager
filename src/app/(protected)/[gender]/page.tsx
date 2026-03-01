@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
 import { Gender } from "@/lib/types";
-import { PlayerTable } from "@/components/player-table";
-import { getUserProfile } from "@/lib/auth";
-import { getFilteredPlayers } from "@/actions/players";
+import { getUserProfile, canAccessGender, getDefaultPath } from "@/lib/auth";
 
-const validGenders: Gender[] = ["damen", "herren"];
+const validGenders: Gender[] = ["female", "male"];
 
 export default async function GenderPage({
   params,
@@ -12,29 +10,13 @@ export default async function GenderPage({
   params: Promise<{ gender: string }>;
 }) {
   const { gender } = await params;
+  const profile = await getUserProfile();
 
-  if (!validGenders.includes(gender as Gender)) {
-    redirect("/damen");
+  if (!profile) redirect("/login");
+
+  if (!validGenders.includes(gender as Gender) || !canAccessGender(profile, gender as Gender)) {
+    redirect(getDefaultPath(profile));
   }
 
-  const initialData = await getFilteredPlayers({
-    gender: gender as Gender,
-    page: 1,
-    pageSize: 50,
-  });
-
-  const profile = await getUserProfile();
-  const isAdmin = profile?.role === "admin";
-  const genderLabel = gender === "damen" ? "Damen" : "Herren";
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Meldeliste {genderLabel}</h2>
-      <PlayerTable
-        gender={gender as Gender}
-        initialData={initialData}
-        isAdmin={isAdmin}
-      />
-    </div>
-  );
+  redirect(`/${gender}/all`);
 }

@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Gender, AgeClass } from "@/lib/types";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireAdmin, canAccessGender } from "@/lib/auth";
 
 export async function getPlayers(gender: Gender) {
   const supabase = await createClient();
@@ -22,6 +22,7 @@ export interface PlayerFilters {
   gender: Gender;
   search?: string;
   ageClass?: AgeClass;
+  minAge?: number;
   maxAge?: number;
   hideDeleted?: boolean;
   page?: number;
@@ -42,6 +43,7 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
     gender,
     search,
     ageClass = "offen",
+    minAge,
     maxAge,
     hideDeleted = false,
     page = 1,
@@ -61,15 +63,20 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
     query = query.is("deleted_at", null);
   }
 
-  // Age class filter: birth_year <= currentYear - minAge
+  // Age class filter: birth_year <= currentYear - ageClassMinAge
   if (ageClass !== "offen") {
-    const minAge = parseInt(ageClass, 10);
-    const cutoffYear = new Date().getFullYear() - minAge;
-    // birth_date must be <= end of cutoff year (i.e. born in cutoffYear or earlier)
+    const ageClassMin = parseInt(ageClass, 10);
+    const cutoffYear = new Date().getFullYear() - ageClassMin;
     query = query.lte("birth_date", `${cutoffYear}-12-31`);
   }
 
-  // Max age filter: birth_year >= currentYear - maxAge
+  // Min age filter: born on or before currentYear - minAge
+  if (minAge) {
+    const cutoffYear = new Date().getFullYear() - minAge;
+    query = query.lte("birth_date", `${cutoffYear}-12-31`);
+  }
+
+  // Max age filter: born on or after currentYear - maxAge
   if (maxAge) {
     const minYear = new Date().getFullYear() - maxAge;
     query = query.gte("birth_date", `${minYear}-01-01`);
@@ -108,7 +115,7 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
 
 export async function createPlayer(formData: FormData) {
   const profile = await requireRole();
-  if (profile.role === "captain" && profile.team?.gender !== (formData.get("gender") as Gender)) {
+  if (!canAccessGender(profile, formData.get("gender") as Gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
   const supabase = await createClient();
@@ -160,7 +167,7 @@ export async function createPlayer(formData: FormData) {
 
 export async function updatePlayer(formData: FormData) {
   const profile = await requireRole();
-  if (profile.role === "captain" && profile.team?.gender !== (formData.get("gender") as Gender)) {
+  if (!canAccessGender(profile, formData.get("gender") as Gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
   const supabase = await createClient();
@@ -180,6 +187,7 @@ export async function updatePlayer(formData: FormData) {
     first_name: formData.get("first_name") as string,
     birth_date: formData.get("birth_date") as string,
     skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
+    gender,
     notes: (formData.get("notes") as string) || null,
   };
 
@@ -204,7 +212,7 @@ export async function updatePlayer(formData: FormData) {
 
 export async function softDeletePlayer(uuid: string, gender: Gender, playerName: string) {
   const profile = await requireRole();
-  if (profile.role === "captain" && profile.team?.gender !== gender) {
+  if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
   const supabase = await createClient();
@@ -275,7 +283,7 @@ export async function reorderPlayer(
   newSortPosition: number
 ) {
   const profile = await requireRole();
-  if (profile.role === "captain" && profile.team?.gender !== gender) {
+  if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
   const supabase = await createClient();
@@ -303,13 +311,12 @@ export async function reorderPlayer(
     details: { before: { sort_position: before?.sort_position }, after: { sort_position: newSortPosition } },
     user_id: user?.id ?? null,
   });
-
-  revalidatePath(`/${gender}`);
+  // No revalidatePath — realtime subscription handles the UI update
 }
 
 export async function rebalancePositions(gender: Gender) {
   const profile = await requireRole();
-  if (profile.role === "captain" && profile.team?.gender !== gender) {
+  if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
   const supabase = await createClient();
@@ -331,7 +338,7 @@ export async function rebalancePositions(gender: Gender) {
   );
 
   await Promise.all(updates);
-  revalidatePath(`/${gender}`);
+  // No revalidatePath — realtime subscription handles the UI update
 }
 
 export async function getRegistrations(gender: Gender, ageClass: AgeClass) {
@@ -355,7 +362,8 @@ export async function toggleRegistration(
 ) {
   const profile = await requireRole();
   if (profile.role === "captain") {
-    if (profile.team?.gender !== gender || profile.team?.age_class !== ageClass) {
+    const hasScope = profile.teams?.some((t) => t.gender === gender && t.age_class === ageClass);
+    if (!hasScope) {
       throw new Error("Keine Berechtigung für diese Altersklasse");
     }
   }
@@ -390,4 +398,106 @@ export async function toggleRegistration(
   });
 
   revalidatePath(`/${gender}`);
+}
+
+export interface RadarDataPoint {
+  category: string;
+  value: number;
+}
+
+export interface PlayerDistributions {
+  lk: RadarDataPoint[];
+  age: RadarDataPoint[];
+  totalLk: number;
+  totalAge: number;
+}
+
+export async function getPlayerDistributions(filters: {
+  gender: Gender;
+  ageClass: AgeClass;
+  minAge?: number;
+  maxAge?: number;
+  hideDeleted?: boolean;
+}): Promise<PlayerDistributions> {
+  await requireAdmin();
+  const { gender, ageClass, minAge, maxAge, hideDeleted = true } = filters;
+  const supabase = await createClient();
+  let query = supabase
+    .from("players")
+    .select("skill_level, birth_date")
+    .eq("gender", gender);
+
+  if (hideDeleted) {
+    query = query.is("deleted_at", null);
+  }
+
+  if (ageClass !== "offen") {
+    const ageClassMin = parseInt(ageClass, 10);
+    const cutoffYear = new Date().getFullYear() - ageClassMin;
+    query = query.lte("birth_date", `${cutoffYear}-12-31`);
+  }
+
+  if (minAge) {
+    const cutoffYear = new Date().getFullYear() - minAge;
+    query = query.lte("birth_date", `${cutoffYear}-12-31`);
+  }
+
+  if (maxAge) {
+    const minYear = new Date().getFullYear() - maxAge;
+    query = query.gte("birth_date", `${minYear}-01-01`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  if (!data) return { lk: [], age: [], totalLk: 0, totalAge: 0 };
+
+  const currentYear = new Date().getFullYear();
+
+  // LK buckets
+  const lkBuckets: Record<string, number> = {
+    "Spitze (1-4)": 0,
+    "Stark (5-8)": 0,
+    "Mittel (9-13)": 0,
+    "Club (14-18)": 0,
+    "Freizeit (19-25)": 0,
+  };
+  let totalLk = 0;
+  for (const p of data) {
+    if (p.skill_level == null) continue;
+    const lk = Math.round(p.skill_level);
+    totalLk++;
+    if (lk <= 4) lkBuckets["Spitze (1-4)"]++;
+    else if (lk <= 8) lkBuckets["Stark (5-8)"]++;
+    else if (lk <= 13) lkBuckets["Mittel (9-13)"]++;
+    else if (lk <= 18) lkBuckets["Club (14-18)"]++;
+    else lkBuckets["Freizeit (19-25)"]++;
+  }
+
+  // Age buckets
+  const ageBuckets: Record<string, number> = {
+    "< 14": 0,
+    "14–18": 0,
+    "19–29": 0,
+    "30–39": 0,
+    "40–49": 0,
+    "50–59": 0,
+    "60+": 0,
+  };
+  for (const p of data) {
+    const age = currentYear - new Date(p.birth_date).getFullYear();
+    if (age < 14) ageBuckets["< 14"]++;
+    else if (age <= 18) ageBuckets["14–18"]++;
+    else if (age < 30) ageBuckets["19–29"]++;
+    else if (age < 40) ageBuckets["30–39"]++;
+    else if (age < 50) ageBuckets["40–49"]++;
+    else if (age < 60) ageBuckets["50–59"]++;
+    else ageBuckets["60+"]++;
+  }
+
+  return {
+    lk: Object.entries(lkBuckets).map(([category, value]) => ({ category, value })),
+    age: Object.entries(ageBuckets).map(([category, value]) => ({ category, value })),
+    totalLk,
+    totalAge: data.length,
+  };
 }

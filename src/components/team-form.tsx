@@ -72,12 +72,12 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
               <select
                 id="gender"
                 name="gender"
-                defaultValue={team?.gender ?? "herren"}
+                defaultValue={team?.gender ?? "male"}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 required
               >
-                <option value="herren">Herren</option>
-                <option value="damen">Damen</option>
+                <option value="male">Herren</option>
+                <option value="female">Damen</option>
               </select>
             </div>
             <div className="space-y-2">

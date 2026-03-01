@@ -59,7 +59,7 @@ export default function TeamsPage() {
               teams.map((team) => (
                 <TableRow key={team.id}>
                   <TableCell className="font-medium">{team.name}</TableCell>
-                  <TableCell>{team.gender === "herren" ? "Herren" : "Damen"}</TableCell>
+                  <TableCell>{team.gender === "male" ? "Herren" : "Damen"}</TableCell>
                   <TableCell>{team.age_class === "offen" ? "Offen" : team.age_class}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

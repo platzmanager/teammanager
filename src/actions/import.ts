@@ -205,7 +205,7 @@ export async function markPlayersForDeletion(players: MatchPlayer[]) {
   // Log event
   await supabase.from("event_log").insert({
     event_type: "csv_bulk_delete",
-    gender: "herren",
+    gender: "male",
     details: {
       deleted_count: deleted.length,
       not_found_count: notFound.length,
@@ -215,8 +215,8 @@ export async function markPlayersForDeletion(players: MatchPlayer[]) {
     user_id: user?.id ?? null,
   });
 
-  revalidatePath("/herren");
-  revalidatePath("/damen");
+  revalidatePath("/male");
+  revalidatePath("/female");
 
   return { deleted, notFound, alreadyDeleted, skipped, total: players.length };
 }
