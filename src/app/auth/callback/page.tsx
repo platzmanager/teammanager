@@ -9,60 +9,60 @@ function CallbackHandler() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const supabase = createClient();
+	const next = searchParams.get("next") ?? "/female";
 
 	useEffect(() => {
-		async function handleCallback() {
-			const code = searchParams.get("code");
-			const type = searchParams.get("type");
-			const next = searchParams.get("next") ?? "/female";
-			const errorParam = searchParams.get("error");
-			const errorDescription = searchParams.get("error_description");
+		const code = searchParams.get("code");
+		const tokenHash = searchParams.get("token_hash");
+		const type = searchParams.get("type");
+		const errorParam = searchParams.get("error");
+		const errorDescription = searchParams.get("error_description");
 
-			// Supabase redirects with error params for expired/invalid links
-			if (errorParam) {
-				const message = errorDescription || errorParam;
-				router.replace(`/login?error=${encodeURIComponent(message)}`);
-				return;
-			}
+		if (errorParam) {
+			const message = errorDescription || errorParam;
+			router.replace(`/login?error=${encodeURIComponent(message)}`);
+			return;
+		}
 
-			// PKCE flow: exchange code for session
-			if (code) {
-				const { error } = await supabase.auth.exchangeCodeForSession(code);
+		// PKCE flow: exchange code for session (used by password reset, magic links)
+		if (code) {
+			supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
 				if (error) {
 					router.replace("/login?error=auth");
 					return;
 				}
 				if (type === "invite" || type === "recovery") {
 					router.replace("/auth/set-password");
-					return;
+				} else {
+					router.replace(next);
 				}
-				router.replace(next);
-				return;
-			}
-
-			// Implicit flow: hash fragments are handled by supabase-js automatically.
-			// Check if we have a session from the hash.
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-
-			if (session) {
-				// Detect type from hash fragment via onAuthStateChange event or URL hash
-				const hash = window.location.hash;
-				if (hash.includes("type=invite") || hash.includes("type=recovery")) {
-					router.replace("/auth/set-password");
-					return;
-				}
-				router.replace(next);
-				return;
-			}
-
-			// No code and no session — something went wrong
-			router.replace("/login?error=auth");
+			});
+			return;
 		}
 
-		handleCallback();
-	}, [router, searchParams, supabase]);
+		// Token hash flow: email links with token_hash (invite, recovery)
+		if (tokenHash && type) {
+			supabase.auth
+				.verifyOtp({ token_hash: tokenHash, type: type as "invite" | "recovery" | "email" })
+				.then(({ error }) => {
+					if (error) {
+						router.replace(
+							`/login?error=${encodeURIComponent(error.message)}`,
+						);
+						return;
+					}
+					if (type === "invite" || type === "recovery") {
+						router.replace("/auth/set-password");
+					} else {
+						router.replace(next);
+					}
+				});
+			return;
+		}
+
+		// No code or token_hash — nothing to process
+		router.replace("/login");
+	}, [router, next, searchParams, supabase]);
 
 	return (
 		<div className="flex min-h-full items-center justify-center">

@@ -266,6 +266,66 @@ export async function createPlayerViaApi(
   return data[0].uuid;
 }
 
+// --- Mailpit helpers (local Supabase uses Mailpit on port 54324) ---
+
+const MAILPIT_URL = "http://127.0.0.1:54324";
+
+export async function deleteAllEmails() {
+  await fetch(`${MAILPIT_URL}/api/v1/messages`, { method: "DELETE" });
+}
+
+export async function inviteUser(email: string) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      apikey: SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      email,
+      data: {},
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Invite failed: ${JSON.stringify(data)}`);
+  return data;
+}
+
+export async function getLatestEmail(
+  email: string,
+  timeoutMs = 10000,
+): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const listRes = await fetch(
+      `${MAILPIT_URL}/api/v1/messages?query=to:${encodeURIComponent(email)}`,
+    );
+    const list = await listRes.json();
+    if (list.messages?.length > 0) {
+      const msgId = list.messages[0].ID;
+      const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${msgId}`);
+      const msg = await msgRes.json();
+      return msg.HTML || msg.Text || "";
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`No email for ${email} within ${timeoutMs}ms`);
+}
+
+export function extractLinkFromEmail(html: string): string {
+  // Supabase invite emails contain a confirmation link
+  const match = html.match(/href="([^"]*\/auth\/v1\/verify[^"]*)"/);
+  if (!match) {
+    // Try any link containing "token"
+    const tokenMatch = html.match(/href="([^"]*token=[^"]*)"/);
+    if (!tokenMatch) throw new Error("No invite link found in email HTML");
+    return tokenMatch[1].replace(/&amp;/g, "&");
+  }
+  // Unescape HTML entities (href values contain &amp; for &)
+  return match[1].replace(/&amp;/g, "&");
+}
+
 export async function cleanupPlayers(clubId?: string) {
   const filter = clubId
     ? `club_id=eq.${clubId}`

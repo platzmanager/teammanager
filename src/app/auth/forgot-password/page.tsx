@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
@@ -44,12 +45,12 @@ export default function ForgotPasswordPage() {
 							Falls ein Konto mit dieser E-Mail existiert, wurde ein Link zum
 							Zurücksetzen des Passworts gesendet.
 						</p>
-						<a
+						<Link
 							href="/login"
 							className="text-sm font-semibold text-gray-600 hover:text-gray-900"
 						>
 							Zurück zum Login
-						</a>
+						</Link>
 					</div>
 				</div>
 			</div>
@@ -108,12 +109,12 @@ export default function ForgotPasswordPage() {
 					</form>
 
 					<div className="mt-6 text-center">
-						<a
+						<Link
 							href="/login"
 							className="text-sm font-semibold text-gray-600 hover:text-gray-900"
 						>
 							Zurück zum Login
-						</a>
+						</Link>
 					</div>
 				</div>
 			</div>
