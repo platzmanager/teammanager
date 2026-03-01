@@ -3,6 +3,8 @@ import { GenderNav } from "@/components/gender-nav";
 import { UserMenu } from "@/components/user-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfile, getUserGenders } from "@/lib/auth";
+import { getUserClubs } from "@/actions/club";
+import { getCurrentClubId } from "@/lib/club";
 import Link from "next/link";
 
 export default async function ProtectedLayout({
@@ -23,11 +25,15 @@ export default async function ProtectedLayout({
 	const isAdmin = profile?.role === "admin";
 	const allowedGenders = profile ? getUserGenders(profile) : [];
 
+	const clubs = await getUserClubs();
+	const currentClubId = await getCurrentClubId();
+	const currentClub = clubs.find((c) => c.id === currentClubId);
+
 	return (
 		<div className="min-h-screen bg-gray-50">
 			<header className="border-b bg-white">
 				<div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-					<h1 className="text-lg font-bold">TC Thalkirchen</h1>
+					<h1 className="text-lg font-bold">{currentClub?.name ?? "Club"}</h1>
 					<div className="flex items-center gap-4">
 						<GenderNav allowedGenders={allowedGenders} />
 						{isAdmin && (
@@ -50,6 +56,8 @@ export default async function ProtectedLayout({
 							email={user.email ?? ""}
 							role={profile?.role ?? "player"}
 							teams={profile?.teams ?? []}
+							currentClubName={currentClub?.name}
+							hasMultipleClubs={clubs.length > 1}
 						/>
 					</div>
 				</div>

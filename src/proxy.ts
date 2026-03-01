@@ -49,6 +49,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Exempt paths that don't need club context
+  const exemptPaths = ["/club-select", "/api/club/resolve", "/api/logout"];
+  const isExempt = exemptPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  if (!isExempt && !request.cookies.get("current_club_id")?.value) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/club/resolve";
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }
 

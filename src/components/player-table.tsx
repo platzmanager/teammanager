@@ -63,6 +63,7 @@ interface PlayerTableProps {
 	initialData: PaginatedPlayers;
 	isAdmin?: boolean;
 	allowedAgeClasses?: AgeClass[];
+	clubId?: string;
 }
 
 export function PlayerTable({
@@ -71,6 +72,7 @@ export function PlayerTable({
 	initialData,
 	isAdmin = false,
 	allowedAgeClasses,
+	clubId,
 }: PlayerTableProps) {
 	const [data, setData] = useState<PaginatedPlayers>(initialData);
 	const [registeredUuids, setRegisteredUuids] = useState<Set<string>>(
@@ -248,15 +250,16 @@ export function PlayerTable({
 	const supabase = useMemo(() => createClient(), []);
 
 	useEffect(() => {
+		const channelName = clubId ? `players-${gender}-${clubId}` : `players-${gender}`;
 		const channel = supabase
-			.channel(`players-${gender}`)
+			.channel(channelName)
 			.on(
 				"postgres_changes",
 				{
 					event: "*",
 					schema: "public",
 					table: "players",
-					filter: `gender=eq.${gender}`,
+					filter: clubId ? `gender=eq.${gender},club_id=eq.${clubId}` : `gender=eq.${gender}`,
 				},
 				() => {
 					realtimeRefresh();

@@ -7,8 +7,16 @@ export const GENDER_LABELS: Record<Gender, string> = {
 export type AgeClass = "offen" | "30" | "40" | "50" | "60";
 export type UserRole = "admin" | "captain" | "player";
 
+export interface Club {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
 export interface Player {
   uuid: string;
+  club_id: string;
   license: string | null;
   last_name: string;
   first_name: string;
@@ -40,6 +48,7 @@ export interface EventLog {
 
 export interface Team {
   id: string;
+  club_id: string;
   name: string;
   gender: Gender;
   age_class: AgeClass;

@@ -8,12 +8,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserRole, Team } from "@/lib/types";
+import { UserRole, Team, Club } from "@/lib/types";
 
 interface UserMenuProps {
   email: string;
   role: UserRole;
   teams: Team[];
+  currentClubName?: string;
+  hasMultipleClubs?: boolean;
 }
 
 const roleLabels: Record<UserRole, string> = {
@@ -22,7 +24,7 @@ const roleLabels: Record<UserRole, string> = {
   player: "Spieler",
 };
 
-export function UserMenu({ email, role, teams }: UserMenuProps) {
+export function UserMenu({ email, role, teams, currentClubName, hasMultipleClubs }: UserMenuProps) {
   const initials = email
     .split("@")[0]
     .split(/[._-]/)
@@ -57,6 +59,13 @@ export function UserMenu({ email, role, teams }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {hasMultipleClubs && (
+          <DropdownMenuItem asChild>
+            <a href="/club-select" className="w-full">
+              Club wechseln
+            </a>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <form action="/api/logout" method="POST" className="w-full">
             <button type="submit" className="w-full text-left">
