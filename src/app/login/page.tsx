@@ -39,10 +39,7 @@ export default function LoginPage() {
 		<div className="flex min-h-screen items-center justify-center bg-gray-50">
 			<div className="w-full max-w-sm space-y-6 rounded-lg border bg-white p-8 shadow-sm">
 				<div className="text-center">
-					<h1 className="text-2xl font-bold">TC Thalkirchen</h1>
-					<p className="text-sm text-muted-foreground">
-						Meldelisten-Verwaltung
-					</p>
+					<h1 className="text-2xl font-bold">TeamManager Login</h1>
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">

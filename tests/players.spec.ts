@@ -1,8 +1,22 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { createTestUser, deleteTestUser, login, cleanupPlayers } from "./helpers";
+import {
+  createTestUserWithEmail,
+  deleteTestUser,
+  createUserProfile,
+  deleteUserProfile,
+  createClubViaApi,
+  deleteClubViaApi,
+  addUserToClub,
+  loginAs,
+  cleanupPlayers,
+} from "./helpers";
+
+const PLAYER_TEST_EMAIL = "players-test@test.local";
+const PLAYER_TEST_PASSWORD = "test123456";
 
 let testUserId: string;
+let clubId: string;
 
 // Players spanning different age classes (offen, 30, 40, 50, 60)
 const TEST_PLAYERS = [
@@ -17,13 +31,18 @@ const TEST_PLAYERS = [
 ];
 
 test.beforeAll(async () => {
-  await cleanupPlayers();
-  testUserId = await createTestUser();
+  clubId = await createClubViaApi("Players Test Club", "players-test");
+  await cleanupPlayers(clubId);
+  testUserId = await createTestUserWithEmail(PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
+  await createUserProfile(testUserId, "admin");
+  await addUserToClub(testUserId, clubId);
 });
 
 test.afterAll(async () => {
-  await cleanupPlayers();
+  await cleanupPlayers(clubId);
+  await deleteUserProfile(testUserId);
   await deleteTestUser(testUserId);
+  await deleteClubViaApi(clubId);
 });
 
 async function addPlayer(page: Page, player: typeof TEST_PLAYERS[number]) {
@@ -43,7 +62,7 @@ async function addPlayer(page: Page, player: typeof TEST_PLAYERS[number]) {
 
 test.describe.serial("player management", () => {
   test("create female players", async ({ page }) => {
-    await login(page);
+    await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
     await page.goto("/female/all");
 
     const femalePlayers = TEST_PLAYERS.filter((p) => p.gender === "female");
@@ -58,7 +77,7 @@ test.describe.serial("player management", () => {
   });
 
   test("create male players", async ({ page }) => {
-    await login(page);
+    await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
     await page.goto("/male/all");
 
     const malePlayers = TEST_PLAYERS.filter((p) => p.gender === "male");
@@ -72,31 +91,27 @@ test.describe.serial("player management", () => {
   });
 
   test("age class filters work", async ({ page }) => {
-    await login(page);
+    await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
     await page.goto("/female/all");
 
     // Tab "40" should show Carla (42), Dagmar (52), Elfriede (66) but not Anna (26) or Bettina (32)
-    await page.getByRole("tab", { name: "40" }).click();
+    await page.getByRole("link", { name: "40" }).click();
     await expect(page.getByText("Vierzig, Carla")).toBeVisible();
     await expect(page.getByText("Fuenfzig, Dagmar")).toBeVisible();
     await expect(page.getByText("Sechzig, Elfriede")).toBeVisible();
     await expect(page.getByText("Jung, Anna")).toBeHidden();
 
     // Tab "60" should only show Elfriede
-    await page.getByRole("tab", { name: "60" }).click();
+    await page.getByRole("link", { name: "60" }).click();
     await expect(page.getByText("Sechzig, Elfriede")).toBeVisible();
     await expect(page.getByText("Vierzig, Carla")).toBeHidden();
   });
 
-  test("registration checkboxes appear on age class tabs", async ({ page }) => {
-    await login(page);
+  test("registration column is visible", async ({ page }) => {
+    await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
     await page.goto("/female/all");
 
-    // "offen" tab should have no checkboxes
-    await expect(page.getByText("Gemeldet")).toBeHidden();
-
-    // Switch to "30" tab — checkbox column should appear
-    await page.getByRole("tab", { name: "30" }).click();
+    // Registration column should be visible
     await expect(page.getByText("Gemeldet")).toBeVisible();
   });
 });

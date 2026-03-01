@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { Gender, AgeClass, GENDER_LABELS } from "@/lib/types";
+import { Gender, AgeClass } from "@/lib/types";
 import { PlayerTable } from "@/components/player-table";
 import { getUserProfile, canAccessGender, canAccessTeamScope, getUserAgeClasses, getDefaultPath } from "@/lib/auth";
 import { getFilteredPlayers } from "@/actions/players";
-import { AgeClassTabs } from "@/components/age-class-tabs";
+import { getCurrentClubId } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
 const validAgeClasses: AgeClass[] = ["offen", "30", "40", "50", "60"];
@@ -51,17 +51,19 @@ export default async function GenderAgeClassPage({
   });
 
   const isAdmin = profile.role === "admin";
-  const genderLabel = GENDER_LABELS[gender as Gender];
   const allowedAgeClasses = getUserAgeClasses(profile, gender as Gender);
+  const clubId = await getCurrentClubId();
 
   return (
     <div className="space-y-4">
       <PlayerTable
+        key={`${gender}-${ageClass}`}
         gender={gender as Gender}
         ageClass={ageClass}
         initialData={initialData}
         isAdmin={isAdmin}
         allowedAgeClasses={isAdmin ? allowedAgeClasses : undefined}
+        clubId={clubId ?? undefined}
       />
     </div>
   );

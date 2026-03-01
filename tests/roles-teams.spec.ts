@@ -6,6 +6,9 @@ import {
   deleteTestUser,
   createUserProfile,
   deleteUserProfile,
+  createClubViaApi,
+  deleteClubViaApi,
+  addUserToClub,
   createTeamViaApi,
   deleteTeamViaApi,
   loginAs,
@@ -20,18 +23,23 @@ const CAPTAIN_PASSWORD = "test123456";
 
 let adminUserId: string;
 let captainUserId: string;
+let clubId: string;
 let teamId: string;
 const createdTeamIds: string[] = [];
 
 test.beforeAll(async () => {
-  teamId = await createTeamViaApi("Herren 30 I", "male", "30");
+  clubId = await createClubViaApi("Roles Test Club", "roles-test");
+
+  teamId = await createTeamViaApi("Herren 30 I", "male", "30", clubId);
   createdTeamIds.push(teamId);
 
   adminUserId = await createTestUserWithEmail(ADMIN_EMAIL, ADMIN_PASSWORD);
   await createUserProfile(adminUserId, "admin");
+  await addUserToClub(adminUserId, clubId);
 
   captainUserId = await createTestUserWithEmail(CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
   await createUserProfile(captainUserId, "captain", teamId);
+  await addUserToClub(captainUserId, clubId);
 });
 
 test.afterAll(async () => {
@@ -43,6 +51,7 @@ test.afterAll(async () => {
   for (const id of createdTeamIds) {
     await deleteTeamViaApi(id);
   }
+  await deleteClubViaApi(clubId);
 });
 
 test("admin sees Teams and Import links", async ({ page }) => {
@@ -67,7 +76,7 @@ test("admin can create a team via UI", async ({ page }) => {
 
   // Track for cleanup
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/teams?name=eq.Damen 40 I`,
+    `${SUPABASE_URL}/rest/v1/teams?name=eq.Damen 40 I&club_id=eq.${clubId}`,
     {
       headers: {
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,

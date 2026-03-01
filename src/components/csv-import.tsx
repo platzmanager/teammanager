@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Gender } from "@/lib/types";
 import { importPlayers, markPlayersForDeletion } from "@/actions/import";
 import { Upload, FileSpreadsheet, Trash2, X, CheckCircle2, AlertTriangle, XCircle, Info } from "lucide-react";
@@ -244,45 +245,36 @@ export function CsvImport() {
 
       {/* Gender selector — only for import mode */}
       {!deleteMode && (
-        <div className="flex items-center gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="gender">Geschlecht</Label>
-            <select
-              id="gender"
-              value={gender}
-              onChange={(e) => setGender(e.target.value as Gender)}
-              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="male">Herren</option>
-              <option value="female">Damen</option>
-            </select>
+        <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="space-y-0.5">
+            <Label className="text-base font-medium">Geschlecht</Label>
+            <p className="text-sm text-muted-foreground">
+              {gender === "male" ? "Spieler werden als Herren importiert" : "Spieler werden als Damen importiert"}
+            </p>
           </div>
-          <div className="flex items-center gap-2 pt-6">
-            <input
-              type="checkbox"
-              id="has-header"
-              checked={hasHeader}
-              onChange={(e) => setHasHeader(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <Label htmlFor="has-header">Erste Zeile ist Kopfzeile</Label>
-          </div>
+          <Select value={gender} onValueChange={(v) => setGender(v as Gender)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Herren</SelectItem>
+              <SelectItem value="female">Damen</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       )}
 
-      {/* Header checkbox in delete mode */}
-      {deleteMode && (
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="has-header-del"
-            checked={hasHeader}
-            onChange={(e) => setHasHeader(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
-          />
-          <Label htmlFor="has-header-del">Erste Zeile ist Kopfzeile</Label>
-        </div>
-      )}
+      {/* Header checkbox */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="has-header"
+          checked={hasHeader}
+          onChange={(e) => setHasHeader(e.target.checked)}
+          className="h-4 w-4 rounded border-input"
+        />
+        <Label htmlFor="has-header">Erste Zeile ist Kopfzeile</Label>
+      </div>
 
       {/* Dropzone */}
       {!fileName ? (
@@ -350,27 +342,28 @@ export function CsvImport() {
                     {field.label}
                     {field.required && <span className="text-destructive ml-0.5">*</span>}
                   </Label>
-                  <select
-                    value={mapping[field.key]}
-                    onChange={(e) => {
-                      setMapping((prev) => ({ ...prev, [field.key]: parseInt(e.target.value) }));
-                    }}
-                    className={`
-                      flex h-9 w-full rounded-md border px-2 py-1 text-sm ring-offset-background
-                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-                      ${mapping[field.key] === -1 && field.required
-                        ? "border-destructive/50 bg-destructive/5"
-                        : "border-input bg-background"
-                      }
-                    `}
+                  <Select
+                    value={String(mapping[field.key])}
+                    onValueChange={(v) => setMapping((prev) => ({ ...prev, [field.key]: parseInt(v) }))}
                   >
-                    <option value={-1}>— Nicht zugeordnet —</option>
-                    {headers.map((h, i) => (
-                      <option key={i} value={i}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      className={`w-full ${
+                        mapping[field.key] === -1 && field.required
+                          ? "border-destructive/50 bg-destructive/5"
+                          : ""
+                      }`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="-1">— Nicht zugeordnet —</SelectItem>
+                      {headers.map((h, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {h}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               ))}
             </div>

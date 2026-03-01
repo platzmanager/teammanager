@@ -1,21 +1,23 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Gender, AgeClass } from "@/lib/types";
 import { requireRole, requireAdmin, canAccessGender } from "@/lib/auth";
+import { withClubContext } from "@/lib/club";
 
 export async function getPlayers(gender: Gender) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("players")
-    .select("*")
-    .eq("gender", gender)
-    .order("skill_level", { ascending: true })
-    .order("sort_position", { ascending: true });
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("players")
+      .select("*")
+      .eq("gender", gender)
+      .eq("club_id", clubId)
+      .order("skill_level", { ascending: true })
+      .order("sort_position", { ascending: true });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  });
 }
 
 export interface PlayerFilters {
@@ -38,79 +40,73 @@ export interface PaginatedPlayers {
 }
 
 export async function getFilteredPlayers(filters: PlayerFilters): Promise<PaginatedPlayers> {
-  const supabase = await createClient();
-  const {
-    gender,
-    search,
-    ageClass = "offen",
-    minAge,
-    maxAge,
-    hideDeleted = false,
-    page = 1,
-    pageSize = 50,
-  } = filters;
+  return withClubContext(async (supabase, clubId) => {
+    const {
+      gender,
+      search,
+      ageClass = "offen",
+      minAge,
+      maxAge,
+      hideDeleted = false,
+      page = 1,
+      pageSize = 50,
+    } = filters;
 
-  // We need to fetch all matching players first, then sort in JS (because sort logic is complex),
-  // then paginate. Build the query with server-side filters.
-  let query = supabase
-    .from("players")
-    .select("*")
-    .eq("gender", gender)
-    .order("skill_level", { ascending: true })
-    .order("sort_position", { ascending: true });
+    let query = supabase
+      .from("players")
+      .select("*")
+      .eq("gender", gender)
+      .eq("club_id", clubId)
+      .order("skill_level", { ascending: true })
+      .order("sort_position", { ascending: true });
 
-  if (hideDeleted) {
-    query = query.is("deleted_at", null);
-  }
+    if (hideDeleted) {
+      query = query.is("deleted_at", null);
+    }
 
-  // Age class filter: birth_year <= currentYear - ageClassMinAge
-  if (ageClass !== "offen") {
-    const ageClassMin = parseInt(ageClass, 10);
-    const cutoffYear = new Date().getFullYear() - ageClassMin;
-    query = query.lte("birth_date", `${cutoffYear}-12-31`);
-  }
+    if (ageClass !== "offen") {
+      const ageClassMin = parseInt(ageClass, 10);
+      const cutoffYear = new Date().getFullYear() - ageClassMin;
+      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+    }
 
-  // Min age filter: born on or before currentYear - minAge
-  if (minAge) {
-    const cutoffYear = new Date().getFullYear() - minAge;
-    query = query.lte("birth_date", `${cutoffYear}-12-31`);
-  }
+    if (minAge) {
+      const cutoffYear = new Date().getFullYear() - minAge;
+      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+    }
 
-  // Max age filter: born on or after currentYear - maxAge
-  if (maxAge) {
-    const minYear = new Date().getFullYear() - maxAge;
-    query = query.gte("birth_date", `${minYear}-01-01`);
-  }
+    if (maxAge) {
+      const minYear = new Date().getFullYear() - maxAge;
+      query = query.gte("birth_date", `${minYear}-01-01`);
+    }
 
-  // Name search — use ilike on both first and last name
-  if (search && search.trim()) {
-    const q = search.trim();
-    query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
-  }
+    if (search && search.trim()) {
+      const q = search.trim();
+      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
+    const { data, error } = await query;
+    if (error) throw error;
 
-  const allPlayers = data ?? [];
+    const allPlayers = data ?? [];
 
-  // Sort using the same logic as client-side
-  const { sortPlayers } = await import("@/lib/players");
-  const sorted = sortPlayers(allPlayers);
+    const { sortPlayers } = await import("@/lib/players");
+    const sorted = sortPlayers(allPlayers);
 
-  // Paginate
-  const total = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const start = (safePage - 1) * pageSize;
-  const paginated = sorted.slice(start, start + pageSize);
+    const total = sorted.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    const start = (safePage - 1) * pageSize;
+    const paginated = sorted.slice(start, start + pageSize);
 
-  return {
-    players: paginated,
-    total,
-    page: safePage,
-    pageSize,
-    totalPages,
-  };
+    return {
+      players: paginated,
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
+    };
+  });
 }
 
 export async function createPlayer(formData: FormData) {
@@ -118,51 +114,55 @@ export async function createPlayer(formData: FormData) {
   if (!canAccessGender(profile, formData.get("gender") as Gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
-  const supabase = await createClient();
-  const gender = formData.get("gender") as Gender;
 
-  // Get max sort_position for this gender
-  const { data: existing } = await supabase
-    .from("players")
-    .select("sort_position")
-    .eq("gender", gender)
-    .order("sort_position", { ascending: false })
-    .limit(1);
+  return withClubContext(async (supabase, clubId) => {
+    const gender = formData.get("gender") as Gender;
 
-  const maxPos = existing?.[0]?.sort_position ?? 0;
+    const { data: existing } = await supabase
+      .from("players")
+      .select("sort_position")
+      .eq("gender", gender)
+      .eq("club_id", clubId)
+      .order("sort_position", { ascending: false })
+      .limit(1);
 
-  const firstName = formData.get("first_name") as string;
-  const lastName = formData.get("last_name") as string;
+    const maxPos = existing?.[0]?.sort_position ?? 0;
 
-  const playerData = {
-    license: (formData.get("license") as string) || null,
-    last_name: lastName,
-    first_name: firstName,
-    birth_date: formData.get("birth_date") as string,
-    skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
-    gender,
-    sort_position: maxPos + 100,
-    notes: (formData.get("notes") as string) || null,
-  };
+    const firstName = formData.get("first_name") as string;
+    const lastName = formData.get("last_name") as string;
 
-  const { data: inserted, error } = await supabase
-    .from("players")
-    .insert(playerData)
-    .select("uuid")
-    .single();
+    const playerData = {
+      license: (formData.get("license") as string) || null,
+      last_name: lastName,
+      first_name: firstName,
+      birth_date: formData.get("birth_date") as string,
+      skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
+      gender,
+      sort_position: maxPos + 100,
+      notes: (formData.get("notes") as string) || null,
+      club_id: clubId,
+    };
 
-  if (error) throw error;
+    const { data: inserted, error } = await supabase
+      .from("players")
+      .insert(playerData)
+      .select("uuid")
+      .single();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from("event_log").insert({
-    event_type: "create",
-    gender,
-    player_uuid: inserted.uuid,
-    details: { after: playerData },
-    user_id: user?.id ?? null,
+    if (error) throw error;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("event_log").insert({
+      event_type: "create",
+      gender,
+      player_uuid: inserted.uuid,
+      details: { after: playerData },
+      user_id: user?.id ?? null,
+      club_id: clubId,
+    });
+
+    revalidatePath(`/${gender}`);
   });
-
-  revalidatePath(`/${gender}`);
 }
 
 export async function updatePlayer(formData: FormData) {
@@ -170,85 +170,88 @@ export async function updatePlayer(formData: FormData) {
   if (!canAccessGender(profile, formData.get("gender") as Gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
-  const supabase = await createClient();
-  const uuid = formData.get("uuid") as string;
-  const gender = formData.get("gender") as Gender;
 
-  // Fetch current state before update
-  const { data: before } = await supabase
-    .from("players")
-    .select("license, last_name, first_name, birth_date, skill_level, notes")
-    .eq("uuid", uuid)
-    .single();
+  return withClubContext(async (supabase, clubId) => {
+    const uuid = formData.get("uuid") as string;
+    const gender = formData.get("gender") as Gender;
 
-  const updateData = {
-    license: (formData.get("license") as string) || null,
-    last_name: formData.get("last_name") as string,
-    first_name: formData.get("first_name") as string,
-    birth_date: formData.get("birth_date") as string,
-    skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
-    gender,
-    notes: (formData.get("notes") as string) || null,
-  };
+    const { data: before } = await supabase
+      .from("players")
+      .select("license, last_name, first_name, birth_date, skill_level, notes")
+      .eq("uuid", uuid)
+      .eq("club_id", clubId)
+      .single();
 
-  const { error } = await supabase
-    .from("players")
-    .update(updateData)
-    .eq("uuid", uuid);
+    const updateData = {
+      license: (formData.get("license") as string) || null,
+      last_name: formData.get("last_name") as string,
+      first_name: formData.get("first_name") as string,
+      birth_date: formData.get("birth_date") as string,
+      skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
+      gender,
+      notes: (formData.get("notes") as string) || null,
+    };
 
-  if (error) throw error;
+    const { error } = await supabase
+      .from("players")
+      .update(updateData)
+      .eq("uuid", uuid)
+      .eq("club_id", clubId);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from("event_log").insert({
-    event_type: "update",
-    gender,
-    player_uuid: uuid,
-    details: { before, after: updateData },
-    user_id: user?.id ?? null,
+    if (error) throw error;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("event_log").insert({
+      event_type: "update",
+      gender,
+      player_uuid: uuid,
+      details: { before, after: updateData },
+      user_id: user?.id ?? null,
+      club_id: clubId,
+    });
+
+    revalidatePath(`/${gender}`);
   });
-
-  revalidatePath(`/${gender}`);
 }
 
-export async function softDeletePlayer(uuid: string, gender: Gender, playerName: string) {
+export async function softDeletePlayer(uuid: string, gender: Gender) {
   const profile = await requireRole();
   if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
-  const supabase = await createClient();
-  // Fetch full player data before soft-deleting
-  const { data: before } = await supabase
-    .from("players")
-    .select("license, last_name, first_name, birth_date, skill_level, notes, sort_position")
-    .eq("uuid", uuid)
-    .single();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  return withClubContext(async (supabase, clubId) => {
+    const { data: before } = await supabase
+      .from("players")
+      .select("license, last_name, first_name, birth_date, skill_level, notes, sort_position")
+      .eq("uuid", uuid)
+      .single();
 
-  // Log the delete event
-  await supabase.from("event_log").insert({
-    event_type: "delete",
-    gender,
-    player_uuid: uuid,
-    details: { before },
-    user_id: user?.id ?? null,
+    const { data: { user } } = await supabase.auth.getUser();
+
+    await supabase.from("event_log").insert({
+      event_type: "delete",
+      gender,
+      player_uuid: uuid,
+      details: { before },
+      user_id: user?.id ?? null,
+      club_id: clubId,
+    });
+
+    const { error } = await supabase
+      .from("players")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("uuid", uuid);
+
+    if (error) throw error;
+
+    await supabase
+      .from("player_registrations")
+      .delete()
+      .eq("player_uuid", uuid);
+
+    revalidatePath(`/${gender}`);
   });
-
-  // Soft-delete: set deleted_at
-  const { error } = await supabase
-    .from("players")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("uuid", uuid);
-
-  if (error) throw error;
-
-  // Remove all registrations for this player
-  await supabase
-    .from("player_registrations")
-    .delete()
-    .eq("player_uuid", uuid);
-
-  revalidatePath(`/${gender}`);
 }
 
 export async function restorePlayer(uuid: string, gender: Gender) {
@@ -256,25 +259,27 @@ export async function restorePlayer(uuid: string, gender: Gender) {
   if (profile.role !== "admin") {
     throw new Error("Nur Admins können Spieler wiederherstellen");
   }
-  const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("players")
-    .update({ deleted_at: null })
-    .eq("uuid", uuid);
+  return withClubContext(async (supabase, clubId) => {
+    const { error } = await supabase
+      .from("players")
+      .update({ deleted_at: null })
+      .eq("uuid", uuid);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from("event_log").insert({
-    event_type: "restore",
-    gender,
-    player_uuid: uuid,
-    details: {},
-    user_id: user?.id ?? null,
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("event_log").insert({
+      event_type: "restore",
+      gender,
+      player_uuid: uuid,
+      details: {},
+      user_id: user?.id ?? null,
+      club_id: clubId,
+    });
+
+    revalidatePath(`/${gender}`);
   });
-
-  revalidatePath(`/${gender}`);
 }
 
 export async function reorderPlayer(
@@ -286,32 +291,31 @@ export async function reorderPlayer(
   if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
-  const supabase = await createClient();
 
-  // Fetch old position before update
-  const { data: before } = await supabase
-    .from("players")
-    .select("sort_position")
-    .eq("uuid", uuid)
-    .single();
+  return withClubContext(async (supabase, clubId) => {
+    const { data: before } = await supabase
+      .from("players")
+      .select("sort_position")
+      .eq("uuid", uuid)
+      .single();
 
-  const { error } = await supabase
-    .from("players")
-    .update({ sort_position: newSortPosition })
-    .eq("uuid", uuid);
+    const { error } = await supabase
+      .from("players")
+      .update({ sort_position: newSortPosition })
+      .eq("uuid", uuid);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  // Log reorder event
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from("event_log").insert({
-    event_type: "reorder",
-    gender,
-    player_uuid: uuid,
-    details: { before: { sort_position: before?.sort_position }, after: { sort_position: newSortPosition } },
-    user_id: user?.id ?? null,
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("event_log").insert({
+      event_type: "reorder",
+      gender,
+      player_uuid: uuid,
+      details: { before: { sort_position: before?.sort_position }, after: { sort_position: newSortPosition } },
+      user_id: user?.id ?? null,
+      club_id: clubId,
+    });
   });
-  // No revalidatePath — realtime subscription handles the UI update
 }
 
 export async function rebalancePositions(gender: Gender) {
@@ -319,38 +323,41 @@ export async function rebalancePositions(gender: Gender) {
   if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
   }
-  const supabase = await createClient();
 
-  const { data: players, error: fetchError } = await supabase
-    .from("players")
-    .select("uuid, sort_position")
-    .eq("gender", gender)
-    .order("sort_position", { ascending: true });
-
-  if (fetchError) throw fetchError;
-  if (!players) return;
-
-  const updates = players.map((p, i) =>
-    supabase
+  return withClubContext(async (supabase, clubId) => {
+    const { data: players, error: fetchError } = await supabase
       .from("players")
-      .update({ sort_position: (i + 1) * 100 })
-      .eq("uuid", p.uuid)
-  );
+      .select("uuid, sort_position")
+      .eq("gender", gender)
+      .eq("club_id", clubId)
+      .order("sort_position", { ascending: true });
 
-  await Promise.all(updates);
-  // No revalidatePath — realtime subscription handles the UI update
+    if (fetchError) throw fetchError;
+    if (!players) return;
+
+    const updates = players.map((p, i) =>
+      supabase
+        .from("players")
+        .update({ sort_position: (i + 1) * 100 })
+        .eq("uuid", p.uuid)
+    );
+
+    await Promise.all(updates);
+  });
 }
 
 export async function getRegistrations(gender: Gender, ageClass: AgeClass) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("player_registrations")
-    .select("player_uuid")
-    .eq("gender", gender)
-    .eq("age_class", ageClass);
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("player_registrations")
+      .select("player_uuid, players!inner(club_id)")
+      .eq("gender", gender)
+      .eq("age_class", ageClass)
+      .eq("players.club_id", clubId);
 
-  if (error) throw error;
-  return (data ?? []).map((r: { player_uuid: string }) => r.player_uuid);
+    if (error) throw error;
+    return (data ?? []).map((r: { player_uuid: string }) => r.player_uuid);
+  });
 }
 
 export async function toggleRegistration(
@@ -367,37 +374,39 @@ export async function toggleRegistration(
       throw new Error("Keine Berechtigung für diese Altersklasse");
     }
   }
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  if (registered) {
-    const { error } = await supabase.from("player_registrations").insert({
-      player_uuid: playerUuid,
-      age_class: ageClass,
+  return withClubContext(async (supabase, clubId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (registered) {
+      const { error } = await supabase.from("player_registrations").insert({
+        player_uuid: playerUuid,
+        age_class: ageClass,
+        gender,
+      });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("player_registrations")
+        .delete()
+        .eq("player_uuid", playerUuid)
+        .eq("age_class", ageClass)
+        .eq("gender", gender);
+      if (error) throw error;
+    }
+
+    await supabase.from("event_log").insert({
+      event_type: registered ? "register" : "unregister",
       gender,
+      age_class: ageClass,
+      player_uuid: playerUuid,
+      details: { player_name: playerName },
+      user_id: user?.id ?? null,
+      club_id: clubId,
     });
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from("player_registrations")
-      .delete()
-      .eq("player_uuid", playerUuid)
-      .eq("age_class", ageClass)
-      .eq("gender", gender);
-    if (error) throw error;
-  }
 
-  // Log event
-  await supabase.from("event_log").insert({
-    event_type: registered ? "register" : "unregister",
-    gender,
-    age_class: ageClass,
-    player_uuid: playerUuid,
-    details: { player_name: playerName },
-    user_id: user?.id ?? null,
+    revalidatePath(`/${gender}`);
   });
-
-  revalidatePath(`/${gender}`);
 }
 
 export interface RadarDataPoint {
@@ -420,84 +429,85 @@ export async function getPlayerDistributions(filters: {
   hideDeleted?: boolean;
 }): Promise<PlayerDistributions> {
   await requireAdmin();
-  const { gender, ageClass, minAge, maxAge, hideDeleted = true } = filters;
-  const supabase = await createClient();
-  let query = supabase
-    .from("players")
-    .select("skill_level, birth_date")
-    .eq("gender", gender);
 
-  if (hideDeleted) {
-    query = query.is("deleted_at", null);
-  }
+  return withClubContext(async (supabase, clubId) => {
+    const { gender, ageClass, minAge, maxAge, hideDeleted = true } = filters;
+    let query = supabase
+      .from("players")
+      .select("skill_level, birth_date")
+      .eq("gender", gender)
+      .eq("club_id", clubId);
 
-  if (ageClass !== "offen") {
-    const ageClassMin = parseInt(ageClass, 10);
-    const cutoffYear = new Date().getFullYear() - ageClassMin;
-    query = query.lte("birth_date", `${cutoffYear}-12-31`);
-  }
+    if (hideDeleted) {
+      query = query.is("deleted_at", null);
+    }
 
-  if (minAge) {
-    const cutoffYear = new Date().getFullYear() - minAge;
-    query = query.lte("birth_date", `${cutoffYear}-12-31`);
-  }
+    if (ageClass !== "offen") {
+      const ageClassMin = parseInt(ageClass, 10);
+      const cutoffYear = new Date().getFullYear() - ageClassMin;
+      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+    }
 
-  if (maxAge) {
-    const minYear = new Date().getFullYear() - maxAge;
-    query = query.gte("birth_date", `${minYear}-01-01`);
-  }
+    if (minAge) {
+      const cutoffYear = new Date().getFullYear() - minAge;
+      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  if (!data) return { lk: [], age: [], totalLk: 0, totalAge: 0 };
+    if (maxAge) {
+      const minYear = new Date().getFullYear() - maxAge;
+      query = query.gte("birth_date", `${minYear}-01-01`);
+    }
 
-  const currentYear = new Date().getFullYear();
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data) return { lk: [], age: [], totalLk: 0, totalAge: 0 };
 
-  // LK buckets
-  const lkBuckets: Record<string, number> = {
-    "Spitze (1-4)": 0,
-    "Stark (5-8)": 0,
-    "Mittel (9-13)": 0,
-    "Club (14-18)": 0,
-    "Freizeit (19-25)": 0,
-  };
-  let totalLk = 0;
-  for (const p of data) {
-    if (p.skill_level == null) continue;
-    const lk = Math.round(p.skill_level);
-    totalLk++;
-    if (lk <= 4) lkBuckets["Spitze (1-4)"]++;
-    else if (lk <= 8) lkBuckets["Stark (5-8)"]++;
-    else if (lk <= 13) lkBuckets["Mittel (9-13)"]++;
-    else if (lk <= 18) lkBuckets["Club (14-18)"]++;
-    else lkBuckets["Freizeit (19-25)"]++;
-  }
+    const currentYear = new Date().getFullYear();
 
-  // Age buckets
-  const ageBuckets: Record<string, number> = {
-    "< 14": 0,
-    "14–18": 0,
-    "19–29": 0,
-    "30–39": 0,
-    "40–49": 0,
-    "50–59": 0,
-    "60+": 0,
-  };
-  for (const p of data) {
-    const age = currentYear - new Date(p.birth_date).getFullYear();
-    if (age < 14) ageBuckets["< 14"]++;
-    else if (age <= 18) ageBuckets["14–18"]++;
-    else if (age < 30) ageBuckets["19–29"]++;
-    else if (age < 40) ageBuckets["30–39"]++;
-    else if (age < 50) ageBuckets["40–49"]++;
-    else if (age < 60) ageBuckets["50–59"]++;
-    else ageBuckets["60+"]++;
-  }
+    const lkBuckets: Record<string, number> = {
+      "Spitze (1-4)": 0,
+      "Stark (5-8)": 0,
+      "Mittel (9-13)": 0,
+      "Club (14-18)": 0,
+      "Freizeit (19-25)": 0,
+    };
+    let totalLk = 0;
+    for (const p of data) {
+      if (p.skill_level == null) continue;
+      const lk = Math.round(p.skill_level);
+      totalLk++;
+      if (lk <= 4) lkBuckets["Spitze (1-4)"]++;
+      else if (lk <= 8) lkBuckets["Stark (5-8)"]++;
+      else if (lk <= 13) lkBuckets["Mittel (9-13)"]++;
+      else if (lk <= 18) lkBuckets["Club (14-18)"]++;
+      else lkBuckets["Freizeit (19-25)"]++;
+    }
 
-  return {
-    lk: Object.entries(lkBuckets).map(([category, value]) => ({ category, value })),
-    age: Object.entries(ageBuckets).map(([category, value]) => ({ category, value })),
-    totalLk,
-    totalAge: data.length,
-  };
+    const ageBuckets: Record<string, number> = {
+      "< 14": 0,
+      "14–18": 0,
+      "19–29": 0,
+      "30–39": 0,
+      "40–49": 0,
+      "50–59": 0,
+      "60+": 0,
+    };
+    for (const p of data) {
+      const age = currentYear - new Date(p.birth_date).getFullYear();
+      if (age < 14) ageBuckets["< 14"]++;
+      else if (age <= 18) ageBuckets["14–18"]++;
+      else if (age < 30) ageBuckets["19–29"]++;
+      else if (age < 40) ageBuckets["30–39"]++;
+      else if (age < 50) ageBuckets["40–49"]++;
+      else if (age < 60) ageBuckets["50–59"]++;
+      else ageBuckets["60+"]++;
+    }
+
+    return {
+      lk: Object.entries(lkBuckets).map(([category, value]) => ({ category, value })),
+      age: Object.entries(ageBuckets).map(([category, value]) => ({ category, value })),
+      totalLk,
+      totalAge: data.length,
+    };
+  });
 }

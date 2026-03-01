@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Player, Gender } from "@/lib/types";
 import { createPlayer, updatePlayer } from "@/actions/players";
@@ -64,15 +65,15 @@ export function PlayerForm({ gender, player, trigger, onDone, isAdmin = false }:
           {isAdmin && (
             <div className="space-y-2">
               <Label htmlFor="gender">Geschlecht</Label>
-              <select
-                id="gender"
-                value={selectedGender}
-                onChange={(e) => setSelectedGender(e.target.value as Gender)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="female">Damen</option>
-                <option value="male">Herren</option>
-              </select>
+              <Select value={selectedGender} onValueChange={(v) => setSelectedGender(v as Gender)}>
+                <SelectTrigger id="gender" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Herren</SelectItem>
+                  <SelectItem value="female">Damen</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">

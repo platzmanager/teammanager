@@ -26,24 +26,6 @@ export async function createTestUser(): Promise<string> {
   return data.id;
 }
 
-export async function deleteTestUser(userId: string) {
-  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      apikey: SERVICE_ROLE_KEY,
-    },
-  });
-}
-
-export async function login(page: Page) {
-  await page.goto("/login");
-  await page.fill('input[type="email"]', TEST_EMAIL);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/(female|male)\//, { timeout: 10000 });
-}
-
 export async function createTestUserWithEmail(
   email: string,
   password: string,
@@ -62,13 +44,50 @@ export async function createTestUserWithEmail(
   return data.id;
 }
 
+export async function deleteTestUser(userId: string) {
+  await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=minimal",
+    },
+  });
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+    },
+  });
+}
+
+export async function login(page: Page) {
+  await page.goto("/login");
+  await page.fill('input[type="email"]', TEST_EMAIL);
+  await page.fill('input[type="password"]', TEST_PASSWORD);
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/(female|male)|\/admin|\/club-select/, {
+    timeout: 15000,
+  });
+}
+
+export async function loginAs(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', password);
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/(female|male)|\/admin|\/club-select/, {
+    timeout: 15000,
+  });
+}
+
 export async function createUserProfile(
   userId: string,
   role: "admin" | "captain" | "player",
   teamIds?: string | string[],
 ) {
   const body: Record<string, string> = { id: userId, role };
-  // Keep team_id for backward compat
   const ids = teamIds ? (Array.isArray(teamIds) ? teamIds : [teamIds]) : [];
   if (ids.length > 0) body.team_id = ids[0];
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
@@ -83,7 +102,6 @@ export async function createUserProfile(
   });
   expect(res.ok).toBeTruthy();
 
-  // Insert into user_team_assignments
   for (const teamId of ids) {
     const aRes = await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
       method: "POST",
@@ -100,6 +118,14 @@ export async function createUserProfile(
 }
 
 export async function deleteUserProfile(userId: string) {
+  await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=minimal",
+    },
+  });
   await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}`, {
     method: "DELETE",
     headers: {
@@ -110,10 +136,73 @@ export async function deleteUserProfile(userId: string) {
   });
 }
 
+// --- Club helpers ---
+
+export async function createClubViaApi(
+  name: string,
+  slug: string,
+): Promise<string> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/clubs`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ name, slug }),
+  });
+  const data = await res.json();
+  expect(data[0]?.id).toBeTruthy();
+  return data[0].id;
+}
+
+export async function deleteClubViaApi(id: string) {
+  await fetch(`${SUPABASE_URL}/rest/v1/clubs?id=eq.${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=minimal",
+    },
+  });
+}
+
+export async function addUserToClub(userId: string, clubId: string) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/user_clubs`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ user_id: userId, club_id: clubId }),
+  });
+  expect(res.ok).toBeTruthy();
+}
+
+export async function removeUserFromClub(userId: string, clubId: string) {
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}&club_id=eq.${clubId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: SERVICE_ROLE_KEY,
+        Prefer: "return=minimal",
+      },
+    },
+  );
+}
+
+// --- Team helpers ---
+
 export async function createTeamViaApi(
   name: string,
   gender: string,
   ageClass: string,
+  clubId: string,
 ): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/teams`, {
     method: "POST",
@@ -123,7 +212,12 @@ export async function createTeamViaApi(
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=representation",
     },
-    body: JSON.stringify({ name, gender, age_class: ageClass }),
+    body: JSON.stringify({
+      name,
+      gender,
+      age_class: ageClass,
+      club_id: clubId,
+    }),
   });
   const data = await res.json();
   expect(data[0]?.id).toBeTruthy();
@@ -141,16 +235,42 @@ export async function deleteTeamViaApi(id: string) {
   });
 }
 
-export async function loginAs(page: Page, email: string, password: string) {
-  await page.goto("/login");
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', password);
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/(female|male)\/|\/admin/, { timeout: 10000 });
+// --- Player helpers ---
+
+export async function createPlayerViaApi(
+  clubId: string,
+  player: {
+    first_name: string;
+    last_name: string;
+    birth_date: string;
+    gender: string;
+    skill_level?: number;
+  },
+): Promise<string> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      apikey: SERVICE_ROLE_KEY,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      ...player,
+      club_id: clubId,
+      sort_position: 0,
+    }),
+  });
+  const data = await res.json();
+  expect(data[0]?.uuid).toBeTruthy();
+  return data[0].uuid;
 }
 
-export async function cleanupPlayers() {
-  await fetch(`${SUPABASE_URL}/rest/v1/players?uuid=neq.00000000-0000-0000-0000-000000000000`, {
+export async function cleanupPlayers(clubId?: string) {
+  const filter = clubId
+    ? `club_id=eq.${clubId}`
+    : `uuid=neq.00000000-0000-0000-0000-000000000000`;
+  await fetch(`${SUPABASE_URL}/rest/v1/players?${filter}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,

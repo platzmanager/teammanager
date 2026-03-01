@@ -65,7 +65,7 @@ export function SortableRow({
   const playerName = `${player.first_name} ${player.last_name}`;
 
   async function handleDelete() {
-    await softDeletePlayer(player.uuid, gender, playerName);
+    await softDeletePlayer(player.uuid, gender);
     onRefresh();
   }
 

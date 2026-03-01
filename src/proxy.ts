@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
@@ -46,6 +46,16 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Exempt paths that don't need club context
+  const exemptPaths = ["/club-select", "/api/club/resolve", "/api/logout"];
+  const isExempt = exemptPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  if (!isExempt && !request.cookies.get("current_club_id")?.value) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/club/resolve";
     return NextResponse.redirect(url);
   }
 

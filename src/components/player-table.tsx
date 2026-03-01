@@ -63,6 +63,7 @@ interface PlayerTableProps {
 	initialData: PaginatedPlayers;
 	isAdmin?: boolean;
 	allowedAgeClasses?: AgeClass[];
+	clubId?: string;
 }
 
 export function PlayerTable({
@@ -71,6 +72,7 @@ export function PlayerTable({
 	initialData,
 	isAdmin = false,
 	allowedAgeClasses,
+	clubId,
 }: PlayerTableProps) {
 	const [data, setData] = useState<PaginatedPlayers>(initialData);
 	const [registeredUuids, setRegisteredUuids] = useState<Set<string>>(
@@ -92,11 +94,6 @@ export function PlayerTable({
 	const suppressRealtime = useRef(false);
 	const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 	const [isSaving, setIsSaving] = useState(false);
-
-	// Reset age range when age class changes (e.g. switching tabs)
-	useEffect(() => {
-		setAgeRange([ageClassMin, 100]);
-	}, [ageClassMin]);
 	const [isPending, startTransition] = useTransition();
 	const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -152,7 +149,7 @@ export function PlayerTable({
 				setHasMore(result.page < result.totalPages);
 			});
 		},
-		[gender, ageClass, searchQuery, hideDeleted, ageRange, page],
+		[gender, ageClass, searchQuery, hideDeleted, ageRange, page, ageClassMin],
 	);
 
 	// Debounced search
@@ -233,30 +230,29 @@ export function PlayerTable({
 		setRegisteredUuids(new Set(uuids));
 	}, [gender, ageClass]);
 
-	useEffect(() => {
-		setData(initialData);
-		setAllPlayers(initialData.players);
-		setHasMore(initialData.page < initialData.totalPages);
-		setPage(1);
-	}, [initialData]);
 
 	useEffect(() => {
-		refreshRegistrations();
-	}, [refreshRegistrations]);
+		let cancelled = false;
+		getRegistrations(gender, ageClass).then((uuids) => {
+			if (!cancelled) setRegisteredUuids(new Set(uuids));
+		});
+		return () => { cancelled = true; };
+	}, [gender, ageClass]);
 
 	// Realtime subscriptions
 	const supabase = useMemo(() => createClient(), []);
 
 	useEffect(() => {
+		const channelName = clubId ? `players-${gender}-${clubId}` : `players-${gender}`;
 		const channel = supabase
-			.channel(`players-${gender}`)
+			.channel(channelName)
 			.on(
 				"postgres_changes",
 				{
 					event: "*",
 					schema: "public",
 					table: "players",
-					filter: `gender=eq.${gender}`,
+					filter: clubId ? `gender=eq.${gender},club_id=eq.${clubId}` : `gender=eq.${gender}`,
 				},
 				() => {
 					realtimeRefresh();
@@ -281,7 +277,7 @@ export function PlayerTable({
 				clearTimeout(realtimeDebounceRef.current);
 			supabase.removeChannel(channel);
 		};
-	}, [supabase, gender, realtimeRefresh, refreshRegistrations]);
+	}, [supabase, gender, clubId, realtimeRefresh, refreshRegistrations]);
 
 	const players = allPlayers;
 	const showRegistration = true;
@@ -385,8 +381,6 @@ export function PlayerTable({
 	}
 
 	const genderLabel = GENDER_LABELS[gender];
-	const isFiltering =
-		ageRange[0] > 0 || ageRange[1] < 100 || searchQuery || hideDeleted;
 
 	return (
 		<div className="space-y-4">

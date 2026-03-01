@@ -23,7 +23,11 @@ export default function TeamsPage() {
   };
 
   useEffect(() => {
-    refresh();
+    let cancelled = false;
+    getTeams().then((data) => {
+      if (!cancelled) setTeams(data);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   async function handleDelete(id: string, name: string) {
