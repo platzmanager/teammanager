@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
-	const [email, setEmail] = useState("");
+export default function SetPasswordPage() {
 	const [password, setPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 	const router = useRouter();
@@ -17,16 +17,24 @@ export default function LoginPage() {
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
-		setLoading(true);
 		setError("");
 
-		const { error } = await supabase.auth.signInWithPassword({
-			email,
-			password,
-		});
+		if (password !== confirmPassword) {
+			setError("Passwörter stimmen nicht überein.");
+			return;
+		}
+
+		if (password.length < 8) {
+			setError("Passwort muss mindestens 8 Zeichen lang sein.");
+			return;
+		}
+
+		setLoading(true);
+
+		const { error } = await supabase.auth.updateUser({ password });
 
 		if (error) {
-			setError("Login fehlgeschlagen. Bitte prüfe deine Zugangsdaten.");
+			setError("Passwort konnte nicht gesetzt werden. Bitte versuche es erneut.");
 			setLoading(false);
 			return;
 		}
@@ -39,22 +47,15 @@ export default function LoginPage() {
 		<div className="flex min-h-screen items-center justify-center bg-gray-50">
 			<div className="w-full max-w-sm space-y-6 rounded-lg border bg-white p-8 shadow-sm">
 				<div className="text-center">
-					<h1 className="text-2xl font-bold">TeamManager Login</h1>
+					<h1 className="text-2xl font-bold">Passwort setzen</h1>
+					<p className="mt-1 text-sm text-gray-500">
+						Bitte wähle ein neues Passwort.
+					</p>
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<div className="space-y-2">
-						<Label htmlFor="email">E-Mail</Label>
-						<Input
-							id="email"
-							type="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							required
-						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="password">Passwort</Label>
+						<Label htmlFor="password">Neues Passwort</Label>
 						<Input
 							id="password"
 							type="password"
@@ -63,22 +64,23 @@ export default function LoginPage() {
 							required
 						/>
 					</div>
+					<div className="space-y-2">
+						<Label htmlFor="confirmPassword">Passwort bestätigen</Label>
+						<Input
+							id="confirmPassword"
+							type="password"
+							value={confirmPassword}
+							onChange={(e) => setConfirmPassword(e.target.value)}
+							required
+						/>
+					</div>
 
 					{error && <p className="text-sm text-red-600">{error}</p>}
 
 					<Button type="submit" className="w-full" disabled={loading}>
-						{loading ? "Wird eingeloggt..." : "Einloggen"}
+						{loading ? "Wird gespeichert..." : "Passwort speichern"}
 					</Button>
 				</form>
-
-				<div className="text-center">
-					<a
-						href="/auth/forgot-password"
-						className="text-sm text-gray-500 hover:text-gray-700 underline"
-					>
-						Passwort vergessen?
-					</a>
-				</div>
 			</div>
 		</div>
 	);
