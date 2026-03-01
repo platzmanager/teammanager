@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup-club": "dotenvx run -f .env.local -- node --experimental-strip-types scripts/setup-club.mts",
+    "setup-club:prod": "dotenvx run -f .env.prod -- node --experimental-strip-types scripts/setup-club.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
