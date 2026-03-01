@@ -73,7 +73,7 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
             <div className="space-y-2">
               <Label htmlFor="gender">Geschlecht</Label>
               <input type="hidden" name="gender" value={gender} />
-              <Select value={gender} onValueChange={setGender}>
+              <Select value={gender} onValueChange={v => setGender(v as "male" | "female")}>
                 <SelectTrigger id="gender" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -86,7 +86,7 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
             <div className="space-y-2">
               <Label htmlFor="age_class">Altersklasse</Label>
               <input type="hidden" name="age_class" value={ageClass} />
-              <Select value={ageClass} onValueChange={setAgeClass}>
+              <Select value={ageClass} onValueChange={v => setAgeClass(v as typeof ageClass)}>
                 <SelectTrigger id="age_class" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
