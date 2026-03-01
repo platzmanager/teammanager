@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -24,8 +24,36 @@ function LoginForm() {
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState(urlError ? getErrorMessage(urlError) : "");
 	const [loading, setLoading] = useState(false);
+	const [hashLoading, setHashLoading] = useState(false);
 	const router = useRouter();
 	const supabase = createClient();
+
+	// Handle hash fragment tokens from Supabase email links (invite, recovery)
+	useEffect(() => {
+		const hash = window.location.hash;
+		if (!hash || !hash.includes("access_token")) return;
+
+		setHashLoading(true);
+
+		// supabase-js automatically picks up the hash fragment and establishes a session
+		supabase.auth.onAuthStateChange((event) => {
+			if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+				if (hash.includes("type=invite") || hash.includes("type=recovery")) {
+					router.replace("/auth/set-password");
+				} else {
+					router.replace("/female");
+				}
+			}
+		});
+	}, [router, supabase]);
+
+	if (hashLoading) {
+		return (
+			<div className="flex min-h-full items-center justify-center">
+				<p className="text-sm text-gray-500">Wird authentifiziert...</p>
+			</div>
+		);
+	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
