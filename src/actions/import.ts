@@ -98,8 +98,6 @@ export async function importPlayers(players: ImportPlayer[]) {
       return { count: 0, total: players.length, skipped };
     }
 
-    console.log("Import: clubId =", clubId, "user =", user?.id, "rowCount =", rows.length);
-    console.log("Import: sample row =", JSON.stringify(rows[0]));
     const { error } = await supabase.from("players").insert(rows);
     if (error) {
       console.error("Import DB error:", JSON.stringify(error, null, 2));

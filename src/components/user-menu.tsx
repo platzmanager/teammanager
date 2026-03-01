@@ -8,13 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserRole, Team, Club } from "@/lib/types";
+import Link from "next/link";
+import { UserRole, Team } from "@/lib/types";
 
 interface UserMenuProps {
   email: string;
   role: UserRole;
   teams: Team[];
-  currentClubName?: string;
   hasMultipleClubs?: boolean;
 }
 
@@ -24,7 +24,7 @@ const roleLabels: Record<UserRole, string> = {
   player: "Spieler",
 };
 
-export function UserMenu({ email, role, teams, currentClubName, hasMultipleClubs }: UserMenuProps) {
+export function UserMenu({ email, role, teams, hasMultipleClubs }: UserMenuProps) {
   const initials = email
     .split("@")[0]
     .split(/[._-]/)
@@ -61,9 +61,9 @@ export function UserMenu({ email, role, teams, currentClubName, hasMultipleClubs
         <DropdownMenuSeparator />
         {hasMultipleClubs && (
           <DropdownMenuItem asChild>
-            <a href="/club-select" className="w-full">
+            <Link href="/club-select" className="w-full">
               Club wechseln
-            </a>
+            </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>

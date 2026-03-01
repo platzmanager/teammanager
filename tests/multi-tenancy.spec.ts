@@ -1,7 +1,5 @@
 import { test, expect } from "@playwright/test";
 import {
-  SUPABASE_URL,
-  SERVICE_ROLE_KEY,
   createTestUserWithEmail,
   deleteTestUser,
   createUserProfile,
@@ -14,13 +12,9 @@ import {
   deleteTeamViaApi,
   createPlayerViaApi,
   cleanupPlayers,
-  loginAs,
 } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
-
-// The seeded default club from migration
-const DEFAULT_CLUB_ID = "1d39bc03-0178-45ab-bf5f-3bb3eccf3719";
 
 const ADMIN_EMAIL = "mt-admin@test.local";
 const ADMIN_PASSWORD = "test123456";

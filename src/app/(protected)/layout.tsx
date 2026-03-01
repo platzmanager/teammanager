@@ -56,7 +56,6 @@ export default async function ProtectedLayout({
 							email={user.email ?? ""}
 							role={profile?.role ?? "player"}
 							teams={profile?.teams ?? []}
-							currentClubName={currentClub?.name}
 							hasMultipleClubs={clubs.length > 1}
 						/>
 					</div>

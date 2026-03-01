@@ -179,6 +179,7 @@ export async function updatePlayer(formData: FormData) {
       .from("players")
       .select("license, last_name, first_name, birth_date, skill_level, notes")
       .eq("uuid", uuid)
+      .eq("club_id", clubId)
       .single();
 
     const updateData = {
@@ -194,7 +195,8 @@ export async function updatePlayer(formData: FormData) {
     const { error } = await supabase
       .from("players")
       .update(updateData)
-      .eq("uuid", uuid);
+      .eq("uuid", uuid)
+      .eq("club_id", clubId);
 
     if (error) throw error;
 
@@ -212,7 +214,7 @@ export async function updatePlayer(formData: FormData) {
   });
 }
 
-export async function softDeletePlayer(uuid: string, gender: Gender, playerName: string) {
+export async function softDeletePlayer(uuid: string, gender: Gender) {
   const profile = await requireRole();
   if (!canAccessGender(profile, gender)) {
     throw new Error("Keine Berechtigung für dieses Geschlecht");
@@ -345,12 +347,13 @@ export async function rebalancePositions(gender: Gender) {
 }
 
 export async function getRegistrations(gender: Gender, ageClass: AgeClass) {
-  return withClubContext(async (supabase) => {
+  return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase
       .from("player_registrations")
-      .select("player_uuid")
+      .select("player_uuid, players!inner(club_id)")
       .eq("gender", gender)
-      .eq("age_class", ageClass);
+      .eq("age_class", ageClass)
+      .eq("players.club_id", clubId);
 
     if (error) throw error;
     return (data ?? []).map((r: { player_uuid: string }) => r.player_uuid);

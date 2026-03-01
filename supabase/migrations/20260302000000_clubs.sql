@@ -10,7 +10,6 @@ create table clubs (
 );
 
 alter table clubs enable row level security;
-create policy "authenticated read" on clubs for select to authenticated using (true);
 
 -- 2. Create user_clubs join table
 create table user_clubs (
@@ -66,7 +65,11 @@ returns boolean language sql stable security definer as $$
   );
 $$;
 
--- 11. Replace ALL existing RLS policies with club-scoped versions
+-- 11. Clubs RLS — scoped to user's memberships (must come after function definition)
+create policy "authenticated read" on clubs for select to authenticated
+  using (user_is_club_member(id));
+
+-- 12. Replace ALL existing RLS policies with club-scoped versions
 
 -- === players ===
 drop policy if exists "admin write" on players;

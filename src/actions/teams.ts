@@ -38,7 +38,7 @@ export async function createTeam(formData: FormData) {
 export async function updateTeam(formData: FormData) {
   await requireAdmin();
 
-  return withClubContext(async (supabase) => {
+  return withClubContext(async (supabase, clubId) => {
     const id = formData.get("id") as string;
 
     const { error } = await supabase
@@ -48,7 +48,8 @@ export async function updateTeam(formData: FormData) {
         gender: formData.get("gender") as Gender,
         age_class: formData.get("age_class") as AgeClass,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("club_id", clubId);
 
     if (error) throw error;
     revalidatePath("/admin/teams");
@@ -58,8 +59,8 @@ export async function updateTeam(formData: FormData) {
 export async function deleteTeam(id: string) {
   await requireAdmin();
 
-  return withClubContext(async (supabase) => {
-    const { error } = await supabase.from("teams").delete().eq("id", id);
+  return withClubContext(async (supabase, clubId) => {
+    const { error } = await supabase.from("teams").delete().eq("id", id).eq("club_id", clubId);
     if (error) throw error;
     revalidatePath("/admin/teams");
   });
