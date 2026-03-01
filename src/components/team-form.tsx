@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Team } from "@/lib/types";
 import { createTeam, updateTeam } from "@/actions/teams";
 
@@ -23,6 +24,8 @@ interface TeamFormProps {
 export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [gender, setGender] = useState(team?.gender ?? "male");
+  const [ageClass, setAgeClass] = useState(team?.age_class ?? "offen");
   const isEdit = !!team;
 
   async function handleSubmit(formData: FormData) {
@@ -69,32 +72,32 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="gender">Geschlecht</Label>
-              <select
-                id="gender"
-                name="gender"
-                defaultValue={team?.gender ?? "male"}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
-                <option value="male">Herren</option>
-                <option value="female">Damen</option>
-              </select>
+              <input type="hidden" name="gender" value={gender} />
+              <Select value={gender} onValueChange={setGender}>
+                <SelectTrigger id="gender" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Herren</SelectItem>
+                  <SelectItem value="female">Damen</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="age_class">Altersklasse</Label>
-              <select
-                id="age_class"
-                name="age_class"
-                defaultValue={team?.age_class ?? "offen"}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
-                <option value="offen">Offen</option>
-                <option value="30">30</option>
-                <option value="40">40</option>
-                <option value="50">50</option>
-                <option value="60">60</option>
-              </select>
+              <input type="hidden" name="age_class" value={ageClass} />
+              <Select value={ageClass} onValueChange={setAgeClass}>
+                <SelectTrigger id="age_class" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="offen">Offen</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="40">40</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="60">60</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

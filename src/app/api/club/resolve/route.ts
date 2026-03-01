@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export async function GET() {
   const supabase = await createClient();
@@ -19,14 +18,14 @@ export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   if (clubs.length === 1) {
-    const cookieStore = await cookies();
-    cookieStore.set("current_club_id", clubs[0].club_id, {
+    const response = NextResponse.redirect(new URL("/female", baseUrl));
+    response.cookies.set("current_club_id", clubs[0].club_id, {
       path: "/",
       httpOnly: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 365,
     });
-    return NextResponse.redirect(new URL("/female", baseUrl));
+    return response;
   }
 
   // Multiple or zero clubs — show selection page

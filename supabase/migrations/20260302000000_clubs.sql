@@ -25,7 +25,7 @@ create policy "authenticated read own" on user_clubs for select to authenticated
 
 -- 3. Seed TC Thalkirchen as the first club
 insert into clubs (id, name, slug)
-  values ('00000000-0000-0000-0000-000000000001', 'TC Thalkirchen', 'tc-thalkirchen');
+  values ('1d39bc03-0178-45ab-bf5f-3bb3eccf3719', 'TC Thalkirchen', 'tcthalkirchen');
 
 -- 4. Add club_id columns (nullable first)
 alter table players add column club_id uuid references clubs(id);
@@ -33,9 +33,9 @@ alter table teams add column club_id uuid references clubs(id);
 alter table event_log add column club_id uuid references clubs(id);
 
 -- 5. Backfill all existing rows to TC Thalkirchen
-update players set club_id = '00000000-0000-0000-0000-000000000001' where club_id is null;
-update teams set club_id = '00000000-0000-0000-0000-000000000001' where club_id is null;
-update event_log set club_id = '00000000-0000-0000-0000-000000000001' where club_id is null;
+update players set club_id = '1d39bc03-0178-45ab-bf5f-3bb3eccf3719' where club_id is null;
+update teams set club_id = '1d39bc03-0178-45ab-bf5f-3bb3eccf3719' where club_id is null;
+update event_log set club_id = '1d39bc03-0178-45ab-bf5f-3bb3eccf3719' where club_id is null;
 
 -- 6. Set NOT NULL
 alter table players alter column club_id set not null;
@@ -44,7 +44,7 @@ alter table event_log alter column club_id set not null;
 
 -- 7. Insert all existing users into user_clubs for TC Thalkirchen
 insert into user_clubs (user_id, club_id)
-  select id, '00000000-0000-0000-0000-000000000001'
+  select id, '1d39bc03-0178-45ab-bf5f-3bb3eccf3719'
   from auth.users
   on conflict do nothing;
 
