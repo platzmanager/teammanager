@@ -1,16 +1,28 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+	auth: "Login fehlgeschlagen. Bitte prüfe deine Zugangsdaten.",
+	"Email link is invalid or has expired":
+		"Der Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an.",
+	"Token has expired or is invalid":
+		"Der Link ist abgelaufen. Bitte fordere einen neuen an.",
+};
+
+function getErrorMessage(error: string): string {
+	return ERROR_MESSAGES[error] || error;
+}
+
+function LoginForm() {
+	const searchParams = useSearchParams();
+	const urlError = searchParams.get("error");
+
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [error, setError] = useState("");
+	const [error, setError] = useState(urlError ? getErrorMessage(urlError) : "");
 	const [loading, setLoading] = useState(false);
 	const router = useRouter();
 	const supabase = createClient();
@@ -36,50 +48,93 @@ export default function LoginPage() {
 	}
 
 	return (
-		<div className="flex min-h-screen items-center justify-center bg-gray-50">
-			<div className="w-full max-w-sm space-y-6 rounded-lg border bg-white p-8 shadow-sm">
-				<div className="text-center">
-					<h1 className="text-2xl font-bold">TeamManager Login</h1>
-				</div>
+		<div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+			<div className="sm:mx-auto sm:w-full sm:max-w-md">
+				<h2 className="mt-6 text-center text-2xl/9 font-bold tracking-tight text-gray-900">
+					Matchday.tennis
+				</h2>
+			</div>
 
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<div className="space-y-2">
-						<Label htmlFor="email">E-Mail</Label>
-						<Input
-							id="email"
-							type="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							required
-						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="password">Passwort</Label>
-						<Input
-							id="password"
-							type="password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							required
-						/>
-					</div>
+			<div className="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+				<div className="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+					<form onSubmit={handleSubmit} className="space-y-6">
+						<div>
+							<label
+								htmlFor="email"
+								className="block text-sm/6 font-medium text-gray-900"
+							>
+								E-Mail
+							</label>
+							<div className="mt-2">
+								<input
+									id="email"
+									type="email"
+									value={email}
+									onChange={(e) => setEmail(e.target.value)}
+									required
+									autoComplete="email"
+									className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-gray-900 sm:text-sm/6"
+								/>
+							</div>
+						</div>
 
-					{error && <p className="text-sm text-red-600">{error}</p>}
+						<div>
+							<label
+								htmlFor="password"
+								className="block text-sm/6 font-medium text-gray-900"
+							>
+								Passwort
+							</label>
+							<div className="mt-2">
+								<input
+									id="password"
+									type="password"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									required
+									autoComplete="current-password"
+									className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-gray-900 sm:text-sm/6"
+								/>
+							</div>
+						</div>
 
-					<Button type="submit" className="w-full" disabled={loading}>
-						{loading ? "Wird eingeloggt..." : "Einloggen"}
-					</Button>
-				</form>
+						<div className="flex items-center justify-end">
+							<div className="text-sm/6">
+								<a
+									href="/auth/forgot-password"
+									className="font-semibold text-gray-600 hover:text-gray-900"
+								>
+									Passwort vergessen?
+								</a>
+							</div>
+						</div>
 
-				<div className="text-center">
-					<a
-						href="/auth/forgot-password"
-						className="text-sm text-gray-500 hover:text-gray-700 underline"
-					>
-						Passwort vergessen?
-					</a>
+						{error && (
+							<div className="rounded-md bg-red-50 p-3">
+								<p className="text-sm text-red-700">{error}</p>
+							</div>
+						)}
+
+						<div>
+							<button
+								type="submit"
+								disabled={loading}
+								className="flex w-full justify-center rounded-md bg-gray-900 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50"
+							>
+								{loading ? "Wird eingeloggt..." : "Einloggen"}
+							</button>
+						</div>
+					</form>
 				</div>
 			</div>
 		</div>
+	);
+}
+
+export default function LoginPage() {
+	return (
+		<Suspense>
+			<LoginForm />
+		</Suspense>
 	);
 }

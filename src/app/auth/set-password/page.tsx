@@ -2,9 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SetPasswordPage() {
@@ -34,7 +31,9 @@ export default function SetPasswordPage() {
 		const { error } = await supabase.auth.updateUser({ password });
 
 		if (error) {
-			setError("Passwort konnte nicht gesetzt werden. Bitte versuche es erneut.");
+			setError(
+				"Passwort konnte nicht gesetzt werden. Bitte versuche es erneut.",
+			);
 			setLoading(false);
 			return;
 		}
@@ -44,43 +43,76 @@ export default function SetPasswordPage() {
 	}
 
 	return (
-		<div className="flex min-h-screen items-center justify-center bg-gray-50">
-			<div className="w-full max-w-sm space-y-6 rounded-lg border bg-white p-8 shadow-sm">
-				<div className="text-center">
-					<h1 className="text-2xl font-bold">Passwort setzen</h1>
-					<p className="mt-1 text-sm text-gray-500">
-						Bitte wähle ein neues Passwort.
-					</p>
+		<div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+			<div className="sm:mx-auto sm:w-full sm:max-w-md">
+				<h2 className="mt-6 text-center text-2xl/9 font-bold tracking-tight text-gray-900">
+					Passwort setzen
+				</h2>
+				<p className="mt-2 text-center text-sm text-gray-500">
+					Bitte wähle ein neues Passwort.
+				</p>
+			</div>
+
+			<div className="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+				<div className="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+					<form onSubmit={handleSubmit} className="space-y-6">
+						<div>
+							<label
+								htmlFor="password"
+								className="block text-sm/6 font-medium text-gray-900"
+							>
+								Neues Passwort
+							</label>
+							<div className="mt-2">
+								<input
+									id="password"
+									type="password"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									required
+									autoComplete="new-password"
+									className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-gray-900 sm:text-sm/6"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<label
+								htmlFor="confirmPassword"
+								className="block text-sm/6 font-medium text-gray-900"
+							>
+								Passwort bestätigen
+							</label>
+							<div className="mt-2">
+								<input
+									id="confirmPassword"
+									type="password"
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									required
+									autoComplete="new-password"
+									className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-gray-900 sm:text-sm/6"
+								/>
+							</div>
+						</div>
+
+						{error && (
+							<div className="rounded-md bg-red-50 p-3">
+								<p className="text-sm text-red-700">{error}</p>
+							</div>
+						)}
+
+						<div>
+							<button
+								type="submit"
+								disabled={loading}
+								className="flex w-full justify-center rounded-md bg-gray-900 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50"
+							>
+								{loading ? "Wird gespeichert..." : "Passwort speichern"}
+							</button>
+						</div>
+					</form>
 				</div>
-
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<div className="space-y-2">
-						<Label htmlFor="password">Neues Passwort</Label>
-						<Input
-							id="password"
-							type="password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							required
-						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="confirmPassword">Passwort bestätigen</Label>
-						<Input
-							id="confirmPassword"
-							type="password"
-							value={confirmPassword}
-							onChange={(e) => setConfirmPassword(e.target.value)}
-							required
-						/>
-					</div>
-
-					{error && <p className="text-sm text-red-600">{error}</p>}
-
-					<Button type="submit" className="w-full" disabled={loading}>
-						{loading ? "Wird gespeichert..." : "Passwort speichern"}
-					</Button>
-				</form>
 			</div>
 		</div>
 	);

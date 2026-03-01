@@ -31,10 +31,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Allow login page and auth callback without auth
+  // Allow login page and auth routes without auth
   if (pathname === "/login" || pathname.startsWith("/auth/")) {
-    if (user) {
-      // Already logged in, redirect to app
+    // Set-password needs an authenticated session (invite/recovery token was exchanged)
+    if (user && pathname !== "/auth/set-password") {
       const url = request.nextUrl.clone();
       url.pathname = "/female";
       return NextResponse.redirect(url);
