@@ -1,8 +1,8 @@
 import { expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-export const SUPABASE_URL = "http://127.0.0.1:54321";
-export const SERVICE_ROLE_KEY = "__PLACEHOLDER__";
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321";
+export const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const TEST_EMAIL = "playwright@test.local";
 export const TEST_PASSWORD = "test123456";
