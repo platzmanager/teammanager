@@ -3,7 +3,7 @@
 
 -- 1. Create clubs table
 create table clubs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null unique,
   slug text not null unique,
   created_at timestamptz default now()

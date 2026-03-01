@@ -1,6 +1,6 @@
 -- Teams table (created first, no FK to user_profiles)
 create table teams (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null unique,
   gender gender_enum not null,
   age_class text not null check (age_class in ('offen','30','40','50','60')),

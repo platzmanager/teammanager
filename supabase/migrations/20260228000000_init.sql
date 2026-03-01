@@ -1,8 +1,7 @@
-create extension if not exists "uuid-ossp";
 create type gender_enum as enum ('damen', 'herren');
 
 create table players (
-  uuid uuid primary key default uuid_generate_v4(),
+  uuid uuid primary key default gen_random_uuid(),
   license text,
   last_name text not null,
   first_name text not null,
