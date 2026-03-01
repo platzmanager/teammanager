@@ -1,0 +1,393 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { Gender, AgeClass } from "@/lib/types";
+import { requireRole } from "@/lib/auth";
+
+export async function getPlayers(gender: Gender) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("players")
+    .select("*")
+    .eq("gender", gender)
+    .order("skill_level", { ascending: true })
+    .order("sort_position", { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
+export interface PlayerFilters {
+  gender: Gender;
+  search?: string;
+  ageClass?: AgeClass;
+  maxAge?: number;
+  hideDeleted?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedPlayers {
+  players: import("@/lib/types").Player[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getFilteredPlayers(filters: PlayerFilters): Promise<PaginatedPlayers> {
+  const supabase = await createClient();
+  const {
+    gender,
+    search,
+    ageClass = "offen",
+    maxAge,
+    hideDeleted = false,
+    page = 1,
+    pageSize = 50,
+  } = filters;
+
+  // We need to fetch all matching players first, then sort in JS (because sort logic is complex),
+  // then paginate. Build the query with server-side filters.
+  let query = supabase
+    .from("players")
+    .select("*")
+    .eq("gender", gender)
+    .order("skill_level", { ascending: true })
+    .order("sort_position", { ascending: true });
+
+  if (hideDeleted) {
+    query = query.is("deleted_at", null);
+  }
+
+  // Age class filter: birth_year <= currentYear - minAge
+  if (ageClass !== "offen") {
+    const minAge = parseInt(ageClass, 10);
+    const cutoffYear = new Date().getFullYear() - minAge;
+    // birth_date must be <= end of cutoff year (i.e. born in cutoffYear or earlier)
+    query = query.lte("birth_date", `${cutoffYear}-12-31`);
+  }
+
+  // Max age filter: birth_year >= currentYear - maxAge
+  if (maxAge) {
+    const minYear = new Date().getFullYear() - maxAge;
+    query = query.gte("birth_date", `${minYear}-01-01`);
+  }
+
+  // Name search — use ilike on both first and last name
+  if (search && search.trim()) {
+    const q = search.trim();
+    query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const allPlayers = data ?? [];
+
+  // Sort using the same logic as client-side
+  const { sortPlayers } = await import("@/lib/players");
+  const sorted = sortPlayers(allPlayers);
+
+  // Paginate
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const start = (safePage - 1) * pageSize;
+  const paginated = sorted.slice(start, start + pageSize);
+
+  return {
+    players: paginated,
+    total,
+    page: safePage,
+    pageSize,
+    totalPages,
+  };
+}
+
+export async function createPlayer(formData: FormData) {
+  const profile = await requireRole();
+  if (profile.role === "captain" && profile.team?.gender !== (formData.get("gender") as Gender)) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+  const supabase = await createClient();
+  const gender = formData.get("gender") as Gender;
+
+  // Get max sort_position for this gender
+  const { data: existing } = await supabase
+    .from("players")
+    .select("sort_position")
+    .eq("gender", gender)
+    .order("sort_position", { ascending: false })
+    .limit(1);
+
+  const maxPos = existing?.[0]?.sort_position ?? 0;
+
+  const firstName = formData.get("first_name") as string;
+  const lastName = formData.get("last_name") as string;
+
+  const playerData = {
+    license: (formData.get("license") as string) || null,
+    last_name: lastName,
+    first_name: firstName,
+    birth_date: formData.get("birth_date") as string,
+    skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
+    gender,
+    sort_position: maxPos + 100,
+    notes: (formData.get("notes") as string) || null,
+  };
+
+  const { data: inserted, error } = await supabase
+    .from("players")
+    .insert(playerData)
+    .select("uuid")
+    .single();
+
+  if (error) throw error;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from("event_log").insert({
+    event_type: "create",
+    gender,
+    player_uuid: inserted.uuid,
+    details: { after: playerData },
+    user_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/${gender}`);
+}
+
+export async function updatePlayer(formData: FormData) {
+  const profile = await requireRole();
+  if (profile.role === "captain" && profile.team?.gender !== (formData.get("gender") as Gender)) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+  const supabase = await createClient();
+  const uuid = formData.get("uuid") as string;
+  const gender = formData.get("gender") as Gender;
+
+  // Fetch current state before update
+  const { data: before } = await supabase
+    .from("players")
+    .select("license, last_name, first_name, birth_date, skill_level, notes")
+    .eq("uuid", uuid)
+    .single();
+
+  const updateData = {
+    license: (formData.get("license") as string) || null,
+    last_name: formData.get("last_name") as string,
+    first_name: formData.get("first_name") as string,
+    birth_date: formData.get("birth_date") as string,
+    skill_level: formData.get("skill_level") ? parseFloat(formData.get("skill_level") as string) : null,
+    notes: (formData.get("notes") as string) || null,
+  };
+
+  const { error } = await supabase
+    .from("players")
+    .update(updateData)
+    .eq("uuid", uuid);
+
+  if (error) throw error;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from("event_log").insert({
+    event_type: "update",
+    gender,
+    player_uuid: uuid,
+    details: { before, after: updateData },
+    user_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/${gender}`);
+}
+
+export async function softDeletePlayer(uuid: string, gender: Gender, playerName: string) {
+  const profile = await requireRole();
+  if (profile.role === "captain" && profile.team?.gender !== gender) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+  const supabase = await createClient();
+  // Fetch full player data before soft-deleting
+  const { data: before } = await supabase
+    .from("players")
+    .select("license, last_name, first_name, birth_date, skill_level, notes, sort_position")
+    .eq("uuid", uuid)
+    .single();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Log the delete event
+  await supabase.from("event_log").insert({
+    event_type: "delete",
+    gender,
+    player_uuid: uuid,
+    details: { before },
+    user_id: user?.id ?? null,
+  });
+
+  // Soft-delete: set deleted_at
+  const { error } = await supabase
+    .from("players")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("uuid", uuid);
+
+  if (error) throw error;
+
+  // Remove all registrations for this player
+  await supabase
+    .from("player_registrations")
+    .delete()
+    .eq("player_uuid", uuid);
+
+  revalidatePath(`/${gender}`);
+}
+
+export async function restorePlayer(uuid: string, gender: Gender) {
+  const profile = await requireRole();
+  if (profile.role !== "admin") {
+    throw new Error("Nur Admins können Spieler wiederherstellen");
+  }
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("players")
+    .update({ deleted_at: null })
+    .eq("uuid", uuid);
+
+  if (error) throw error;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from("event_log").insert({
+    event_type: "restore",
+    gender,
+    player_uuid: uuid,
+    details: {},
+    user_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/${gender}`);
+}
+
+export async function reorderPlayer(
+  uuid: string,
+  gender: Gender,
+  newSortPosition: number
+) {
+  const profile = await requireRole();
+  if (profile.role === "captain" && profile.team?.gender !== gender) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+  const supabase = await createClient();
+
+  // Fetch old position before update
+  const { data: before } = await supabase
+    .from("players")
+    .select("sort_position")
+    .eq("uuid", uuid)
+    .single();
+
+  const { error } = await supabase
+    .from("players")
+    .update({ sort_position: newSortPosition })
+    .eq("uuid", uuid);
+
+  if (error) throw error;
+
+  // Log reorder event
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from("event_log").insert({
+    event_type: "reorder",
+    gender,
+    player_uuid: uuid,
+    details: { before: { sort_position: before?.sort_position }, after: { sort_position: newSortPosition } },
+    user_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/${gender}`);
+}
+
+export async function rebalancePositions(gender: Gender) {
+  const profile = await requireRole();
+  if (profile.role === "captain" && profile.team?.gender !== gender) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+  const supabase = await createClient();
+
+  const { data: players, error: fetchError } = await supabase
+    .from("players")
+    .select("uuid, sort_position")
+    .eq("gender", gender)
+    .order("sort_position", { ascending: true });
+
+  if (fetchError) throw fetchError;
+  if (!players) return;
+
+  const updates = players.map((p, i) =>
+    supabase
+      .from("players")
+      .update({ sort_position: (i + 1) * 100 })
+      .eq("uuid", p.uuid)
+  );
+
+  await Promise.all(updates);
+  revalidatePath(`/${gender}`);
+}
+
+export async function getRegistrations(gender: Gender, ageClass: AgeClass) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("player_registrations")
+    .select("player_uuid")
+    .eq("gender", gender)
+    .eq("age_class", ageClass);
+
+  if (error) throw error;
+  return (data ?? []).map((r: { player_uuid: string }) => r.player_uuid);
+}
+
+export async function toggleRegistration(
+  playerUuid: string,
+  ageClass: AgeClass,
+  gender: Gender,
+  registered: boolean,
+  playerName: string
+) {
+  const profile = await requireRole();
+  if (profile.role === "captain") {
+    if (profile.team?.gender !== gender || profile.team?.age_class !== ageClass) {
+      throw new Error("Keine Berechtigung für diese Altersklasse");
+    }
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (registered) {
+    const { error } = await supabase.from("player_registrations").insert({
+      player_uuid: playerUuid,
+      age_class: ageClass,
+      gender,
+    });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("player_registrations")
+      .delete()
+      .eq("player_uuid", playerUuid)
+      .eq("age_class", ageClass)
+      .eq("gender", gender);
+    if (error) throw error;
+  }
+
+  // Log event
+  await supabase.from("event_log").insert({
+    event_type: registered ? "register" : "unregister",
+    gender,
+    age_class: ageClass,
+    player_uuid: playerUuid,
+    details: { player_name: playerName },
+    user_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/${gender}`);
+}
