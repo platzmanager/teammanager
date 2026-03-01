@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const baseUrl = request.nextUrl.origin;
 
   if (!user) {
-    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"));
+    return NextResponse.redirect(new URL("/login", baseUrl));
   }
 
   const { data: memberships } = await supabase
@@ -15,7 +16,6 @@ export async function GET() {
     .eq("user_id", user.id);
 
   const clubs = memberships ?? [];
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   if (clubs.length === 1) {
     const response = NextResponse.redirect(new URL("/female", baseUrl));

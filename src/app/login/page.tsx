@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import logo from "@/assets/logo/matchday-slogan-green.svg";
 
 const ERROR_MESSAGES: Record<string, string> = {
 	auth: "Login fehlgeschlagen. Bitte prüfe deine Zugangsdaten.",
@@ -51,9 +53,7 @@ function LoginForm() {
 	return (
 		<div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
 			<div className="sm:mx-auto sm:w-full sm:max-w-md">
-				<h2 className="mt-6 text-center text-2xl/9 font-bold tracking-tight text-gray-900">
-					Matchday.tennis
-				</h2>
+				<Image src={logo} alt="Matchday.tennis" className="mx-auto mt-6 h-10 w-auto" priority />
 			</div>
 
 			<div className="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
