@@ -1,15 +1,17 @@
 -- Rename age_class 'offen' → 'all' everywhere and add slug column to teams.
 
--- 1. Rename age_class values
+-- 1. Drop old CHECK constraints first
+alter table teams drop constraint if exists teams_age_class_check;
+alter table player_registrations drop constraint if exists player_registrations_age_class_check;
+
+-- 2. Rename age_class values
 update teams set age_class = 'all' where age_class = 'offen';
 update player_registrations set age_class = 'all' where age_class = 'offen';
 
--- 2. Update CHECK constraints
-alter table teams drop constraint if exists teams_age_class_check;
+-- 3. Add new CHECK constraints
 alter table teams add constraint teams_age_class_check
   check (age_class in ('all','30','40','50','60'));
 
-alter table player_registrations drop constraint if exists player_registrations_age_class_check;
 alter table player_registrations add constraint player_registrations_age_class_check
   check (age_class in ('all','30','40','50','60'));
 
