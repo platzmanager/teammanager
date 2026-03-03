@@ -7,16 +7,16 @@ const validGenders: Gender[] = ["female", "male"];
 export default async function GenderPage({
   params,
 }: {
-  params: Promise<{ gender: string }>;
+  params: Promise<{ clubSlug: string; gender: string }>;
 }) {
-  const { gender } = await params;
+  const { clubSlug, gender } = await params;
   const profile = await getUserProfile();
 
   if (!profile) redirect("/login");
 
   if (!validGenders.includes(gender as Gender) || !canAccessGender(profile, gender as Gender)) {
-    redirect(getDefaultPath(profile));
+    redirect(getDefaultPath(profile, clubSlug));
   }
 
-  redirect(`/${gender}/all`);
+  redirect(`/${clubSlug}/players/${gender}/all`);
 }

@@ -178,7 +178,7 @@ test("single-club user auto-resolves without club-select", async ({ page }) => {
   const singleEmail = "mt-single@test.local";
   const singlePassword = "test123456";
   const singleUserId = await createTestUserWithEmail(singleEmail, singlePassword);
-  await createUserProfile(singleUserId, "admin", undefined, { skipDefaultClub: true });
+  await createUserProfile(singleUserId, "admin");
   await addUserToClub(singleUserId, clubAId);
 
   try {

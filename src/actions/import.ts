@@ -113,7 +113,7 @@ export async function importPlayers(players: ImportPlayer[]) {
     });
 
     for (const gender of genders) {
-      revalidatePath(`/${gender}`);
+      revalidatePath("/", "layout");
     }
 
     return { count: rows.length, total: players.length, skipped };
@@ -215,8 +215,7 @@ export async function markPlayersForDeletion(players: MatchPlayer[]) {
       club_id: clubId,
     });
 
-    revalidatePath("/male");
-    revalidatePath("/female");
+    revalidatePath("/", "layout");
 
     return { deleted, notFound, alreadyDeleted, skipped, total: players.length };
   });

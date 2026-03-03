@@ -1,6 +1,8 @@
 import { getUserClubs, switchClub } from "@/actions/club";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import Image from "next/image";
+import logo from "@/assets/logo/matchday-slogan-green.svg";
 
 export default async function ClubSelectPage() {
   const supabase = await createClient();
@@ -11,19 +13,26 @@ export default async function ClubSelectPage() {
 
   if (clubs.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
+        <Image src={logo} alt="Matchday.tennis" className="mb-16 h-10 w-auto" priority />
         <div className="text-center">
           <h1 className="text-xl font-bold">Kein Club zugewiesen</h1>
           <p className="mt-2 text-muted-foreground">
             Bitte kontaktiere einen Administrator.
           </p>
         </div>
+        <form action="/api/logout" method="POST" className="mt-6">
+          <button type="submit" className="mt-8 rounded-lg border px-8 py-3 text-base font-medium text-muted-foreground hover:bg-gray-100 transition-colors">
+            Abmelden
+          </button>
+        </form>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
+      <Image src={logo} alt="Matchday.tennis" className="mb-16 h-10 w-auto" priority />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-xl font-bold">Club auswählen</h1>
@@ -46,6 +55,11 @@ export default async function ClubSelectPage() {
             </form>
           ))}
         </div>
+        <form action="/api/logout" method="POST" className="text-center">
+          <button type="submit" className="mt-8 rounded-lg border px-8 py-3 text-base font-medium text-muted-foreground hover:bg-gray-100 transition-colors">
+            Abmelden
+          </button>
+        </form>
       </div>
     </div>
   );

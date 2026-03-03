@@ -137,11 +137,11 @@ async function createTeam(
   const name = await prompt("Team name (e.g. Damen 1): ");
   const gender = await choose("Gender:", ["female", "male"]);
   const ageClass = await choose("Age class:", [
-    "offen",
-    "u18",
-    "u15",
-    "u12",
-    "u10",
+    "all",
+    "30",
+    "40",
+    "50",
+    "60",
   ]);
 
   const [team] = await post<[{ id: string }]>("/rest/v1/teams", {
@@ -154,28 +154,146 @@ async function createTeam(
   return { id: team.id, name };
 }
 
+async function upsert<T>(
+  path: string,
+  body: Record<string, unknown>,
+  prefer = "return=minimal",
+): Promise<T> {
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      Prefer: `${prefer},resolution=merge-duplicates`,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`API error ${path}: ${text}`);
+  }
+  return (text ? JSON.parse(text) : null) as T;
+}
+
 async function inviteCaptain(clubId: string, teamId: string): Promise<void> {
   const email = await prompt("Captain email: ");
 
-  const user = await post<{ id: string }>("/auth/v1/invite", { email });
-  console.log(`User invited: ${email} (${user.id})`);
+  // Check if user already exists in auth
+  const existing = await get<{ id: string }[]>(
+    `/rest/v1/user_profiles?select=id&id=in.(select id from auth.users where email=eq.${encodeURIComponent(email)})`,
+  ).catch(() => [] as { id: string }[]);
 
-  await post(
-    "/rest/v1/user_profiles",
-    { id: user.id, role: "captain", team_id: teamId },
-    "return=minimal",
+  let userId: string;
+
+  // Try to find existing user via the admin API
+  const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
+    headers,
+  });
+  const listData = await listRes.json();
+  const existingUser = (listData.users ?? []).find(
+    (u: { email: string }) => u.email === email,
   );
-  await post(
+
+  if (existingUser) {
+    userId = existingUser.id;
+    console.log(`User already exists: ${email} (${userId})`);
+  } else {
+    const user = await post<{ id: string }>("/auth/v1/invite", { email });
+    userId = user.id;
+    console.log(`User invited: ${email} (${userId})`);
+  }
+
+  // Create profile if it doesn't exist (don't overwrite existing role)
+  const [existingProfile] = await get<{ id: string }[]>(
+    `/rest/v1/user_profiles?id=eq.${userId}&select=id`,
+  );
+  if (!existingProfile) {
+    await post(
+      "/rest/v1/user_profiles",
+      { id: userId, role: "captain", team_id: teamId },
+      "return=minimal",
+    );
+  }
+
+  // Upsert team assignment (composite PK handles duplicates)
+  await upsert(
     "/rest/v1/user_team_assignments",
-    { user_id: user.id, team_id: teamId },
-    "return=minimal",
+    { user_id: userId, team_id: teamId },
   );
-  await post(
+
+  // Upsert club membership (composite PK handles duplicates)
+  await upsert(
     "/rest/v1/user_clubs",
-    { user_id: user.id, club_id: clubId },
-    "return=minimal",
+    { user_id: userId, club_id: clubId },
   );
+
   console.log("Captain profile, team assignment, and club membership created.");
+}
+
+async function resortPlayers(clubId: string): Promise<void> {
+  const appUrl = process.env.APP_URL;
+  if (!appUrl) {
+    throw new Error("Missing APP_URL env var");
+  }
+  const email = await prompt("Admin email: ");
+  const password = await prompt("Admin password: ");
+
+  // Sign in via Supabase auth to get a session
+  const authRes = await fetch(
+    `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    },
+  );
+
+  if (!authRes.ok) {
+    const err = await authRes.text();
+    throw new Error(`Auth failed: ${err}`);
+  }
+
+  const session = await authRes.json();
+
+  // Build Supabase auth cookie (matches @supabase/ssr raw cookie format)
+  const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+  const cookieName = `sb-${projectRef}-auth-token`;
+  const cookieValue = JSON.stringify(session);
+
+  // Cookie value may exceed browser limits, use chunking like @supabase/ssr
+  const encoded = encodeURIComponent(cookieValue);
+  const CHUNK_SIZE = 3180;
+  const cookieParts: string[] = [];
+
+  if (encoded.length <= CHUNK_SIZE) {
+    cookieParts.push(`${cookieName}=${encoded}`);
+  } else {
+    let remaining = encoded;
+    let i = 0;
+    while (remaining.length > 0) {
+      cookieParts.push(`${cookieName}.${i}=${remaining.slice(0, CHUNK_SIZE)}`);
+      remaining = remaining.slice(CHUNK_SIZE);
+      i++;
+    }
+  }
+
+  cookieParts.push(`current_club_id=${clubId}`);
+  const cookies = cookieParts.join("; ");
+
+  const res = await fetch(`${appUrl}/api/admin/resort-players`, {
+    method: "POST",
+    headers: { Cookie: cookies },
+    redirect: "manual",
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Resort failed (${res.status}): ${text}`);
+  }
+
+  console.log(JSON.parse(text));
 }
 
 // --- Main ---
@@ -187,6 +305,7 @@ async function main() {
     "Create a new club with team and captain",
     "Add a team to an existing club",
     "Invite a captain to an existing team",
+    "Resort players by LK",
   ]);
 
   if (action === "Create a new club with team and captain") {
@@ -203,6 +322,10 @@ async function main() {
     if (addCaptain === "yes") {
       await inviteCaptain(club.id, team.id);
     }
+  } else if (action === "Resort players by LK") {
+    const club = await pickClub();
+    console.log(`\nResorting players for ${club.name}...`);
+    await resortPlayers(club.id);
   } else {
     const club = await pickClub();
     const team = await pickTeam(club.id);

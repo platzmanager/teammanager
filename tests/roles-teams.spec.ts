@@ -16,6 +16,7 @@ import {
 
 test.describe.configure({ mode: "serial" });
 
+const CLUB_SLUG = "roles-test";
 const ADMIN_EMAIL = "admin@test.local";
 const ADMIN_PASSWORD = "test123456";
 const CAPTAIN_EMAIL = "captain@test.local";
@@ -28,7 +29,7 @@ let teamId: string;
 const createdTeamIds: string[] = [];
 
 test.beforeAll(async () => {
-  clubId = await createClubViaApi("Roles Test Club", "roles-test");
+  clubId = await createClubViaApi("Roles Test Club", CLUB_SLUG);
 
   teamId = await createTeamViaApi("Herren 30 I", "male", "30", clubId);
   createdTeamIds.push(teamId);
@@ -54,20 +55,23 @@ test.afterAll(async () => {
   await deleteClubViaApi(clubId);
 });
 
-test("admin sees Teams and Import links", async ({ page }) => {
+test("admin sees Teams, Meldeliste, and Import links", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await expect(page.locator('a[href="/admin/teams"]')).toBeVisible();
-  await expect(page.locator('a[href="/admin/import"]')).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/teams"]`)).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/players/female/all"]`)).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`)).toBeVisible();
 });
 
 test("admin can create a team via UI", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto("/admin/teams");
+  await page.goto(`/${CLUB_SLUG}/teams`);
 
   await page.getByRole("button", { name: "Team hinzufügen" }).click();
   await page.getByLabel("Name").fill("Damen 40 I");
-  await page.locator("#gender").selectOption("female");
-  await page.locator("#age_class").selectOption("40");
+  await page.locator("#gender").click();
+  await page.getByRole("option", { name: "Damen" }).click();
+  await page.locator("#age_class").click();
+  await page.getByRole("option", { name: "40" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.getByRole("cell", { name: "Damen 40 I" })).toBeVisible({
@@ -90,11 +94,11 @@ test("admin can create a team via UI", async ({ page }) => {
 
 test("captain can authenticate", async ({ page }) => {
   await loginAs(page, CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await expect(page).toHaveURL(/\/(female|male)\//, { timeout: 10000 });
+  await expect(page).toHaveURL(new RegExp(`/${CLUB_SLUG}/`), { timeout: 10000 });
 });
 
-test("captain does not see admin links", async ({ page }) => {
+test("captain does not see admin-only links", async ({ page }) => {
   await loginAs(page, CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await expect(page.locator('a[href="/admin/teams"]')).not.toBeVisible();
-  await expect(page.locator('a[href="/admin/import"]')).not.toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/players/female/all"]`)).not.toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`)).not.toBeVisible();
 });

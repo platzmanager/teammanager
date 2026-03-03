@@ -3,44 +3,36 @@ import { Gender, AgeClass } from "@/lib/types";
 import { PlayerTable } from "@/components/player-table";
 import { getUserProfile, canAccessGender, canAccessTeamScope, getUserAgeClasses, getDefaultPath } from "@/lib/auth";
 import { getFilteredPlayers } from "@/actions/players";
+import { getTeams } from "@/actions/teams";
 import { getCurrentClubId } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
-const validAgeClasses: AgeClass[] = ["offen", "30", "40", "50", "60"];
-
-function urlToAgeClass(slug: string): AgeClass | null {
-  if (slug === "all") return "offen";
-  if (validAgeClasses.includes(slug as AgeClass)) return slug as AgeClass;
-  return null;
-}
-
-export function ageClassToUrl(ac: AgeClass): string {
-  return ac === "offen" ? "all" : ac;
-}
+const validAgeClasses: AgeClass[] = ["all", "30", "40", "50", "60"];
 
 export default async function GenderAgeClassPage({
   params,
 }: {
-  params: Promise<{ gender: string; ageClass: string }>;
+  params: Promise<{ clubSlug: string; gender: string; ageClass: string }>;
 }) {
-  const { gender, ageClass: ageClassSlug } = await params;
+  const { clubSlug, gender, ageClass: ageClassSlug } = await params;
   const profile = await getUserProfile();
 
   if (!profile) redirect("/login");
 
   if (!validGenders.includes(gender as Gender) || !canAccessGender(profile, gender as Gender)) {
-    redirect(getDefaultPath(profile));
+    redirect(getDefaultPath(profile, clubSlug));
   }
 
-  const ageClass = urlToAgeClass(ageClassSlug);
-  if (!ageClass) {
-    redirect(`/${gender}/all`);
+  if (!validAgeClasses.includes(ageClassSlug as AgeClass)) {
+    redirect(`/${clubSlug}/players/${gender}/all`);
   }
+
+  const ageClass = ageClassSlug as AgeClass;
 
   // Captain trying to access an age class they don't have
   if (!canAccessTeamScope(profile, gender as Gender, ageClass)) {
     const allowed = getUserAgeClasses(profile, gender as Gender);
-    redirect(`/${gender}/${ageClassToUrl(allowed[0] ?? "offen")}`);
+    redirect(`/${clubSlug}/players/${gender}/${allowed[0] ?? "all"}`);
   }
 
   const initialData = await getFilteredPlayers({
@@ -51,12 +43,20 @@ export default async function GenderAgeClassPage({
   });
 
   const isAdmin = profile.role === "admin";
+  const allowedGenders = isAdmin ? validGenders : [gender as Gender];
   const allowedAgeClasses = getUserAgeClasses(profile, gender as Gender);
   const clubId = await getCurrentClubId();
+  const teams = await getTeams();
+  const userTeamIds = new Set(profile.teams?.map((t) => t.id) ?? []);
+  // Prefer the user's own team for the breadcrumb, fall back to first match
+  const parentTeam = teams.find((t) => t.gender === gender && t.age_class === ageClass && userTeamIds.has(t.id))
+    ?? teams.find((t) => t.gender === gender && t.age_class === ageClass)
+    ?? null;
 
   return (
     <div className="space-y-4">
       <PlayerTable
+        allowedGenders={allowedGenders.length > 1 ? allowedGenders : undefined}
         key={`${gender}-${ageClass}`}
         gender={gender as Gender}
         ageClass={ageClass}
@@ -64,6 +64,8 @@ export default async function GenderAgeClassPage({
         isAdmin={isAdmin}
         allowedAgeClasses={isAdmin ? allowedAgeClasses : undefined}
         clubId={clubId ?? undefined}
+        clubSlug={clubSlug}
+        parentTeam={parentTeam ? { name: parentTeam.name, href: `/${clubSlug}/team/${parentTeam.gender}/${parentTeam.slug}` } : undefined}
       />
     </div>
   );

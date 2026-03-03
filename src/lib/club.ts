@@ -22,3 +22,15 @@ export async function withClubContext<T>(
   const supabase = await createClient();
   return fn(supabase, clubId);
 }
+
+export async function getClubSlug(): Promise<string> {
+  const clubId = await requireClubId();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("slug")
+    .eq("id", clubId)
+    .single();
+  if (error || !data) throw new Error("Club nicht gefunden");
+  return data.slug;
+}

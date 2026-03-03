@@ -46,7 +46,7 @@ function LoginForm() {
 			return;
 		}
 
-		router.push("/female");
+		router.push("/api/club/resolve");
 		router.refresh();
 	}
 

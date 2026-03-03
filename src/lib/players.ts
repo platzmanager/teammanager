@@ -7,7 +7,7 @@ export function getAge(birthDate: string): number {
 }
 
 export function filterByAgeClass(players: Player[], ageClass: AgeClass): Player[] {
-  if (ageClass === "offen") return players;
+  if (ageClass === "all") return players;
   const minAge = parseInt(ageClass, 10);
   return players.filter((p) => getAge(p.birth_date) >= minAge);
 }

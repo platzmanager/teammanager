@@ -9,14 +9,9 @@ export async function getUserClubs(): Promise<Club[]> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
-
   const { data, error } = await supabase
-    .from("user_clubs")
-    .select("club:clubs(*)")
-    .eq("user_id", user.id);
-
+    .from("user_clubs").select("club:clubs(*)").eq("user_id", user.id);
   if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((row: any) => row.club as Club);
 }
 
@@ -24,24 +19,19 @@ export async function switchClub(clubId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Nicht angemeldet");
-
-  // Validate membership
   const { data } = await supabase
-    .from("user_clubs")
-    .select("club_id")
-    .eq("user_id", user.id)
-    .eq("club_id", clubId)
-    .single();
-
+    .from("user_clubs").select("club_id")
+    .eq("user_id", user.id).eq("club_id", clubId).single();
   if (!data) throw new Error("Kein Zugriff auf diesen Club");
+
+  // Look up club slug
+  const { data: club } = await supabase
+    .from("clubs").select("slug").eq("id", clubId).single();
+  const slug = club?.slug ?? clubId;
 
   const cookieStore = await cookies();
   cookieStore.set("current_club_id", clubId, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 365,
+    path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 365,
   });
-
-  redirect("/female");
+  redirect(`/${slug}/teams`);
 }
