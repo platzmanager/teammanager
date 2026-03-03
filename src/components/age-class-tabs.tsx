@@ -8,27 +8,24 @@ interface AgeClassTabsProps {
   gender: Gender;
   current: AgeClass;
   allowed: AgeClass[];
+  clubSlug: string;
 }
 
 const ageClassLabels: Record<AgeClass, string> = {
-  offen: "Alle",
+  all: "Alle",
   "30": "30",
   "40": "40",
   "50": "50",
   "60": "60",
 };
 
-function ageClassToUrl(ac: AgeClass): string {
-  return ac === "offen" ? "all" : ac;
-}
-
-export function AgeClassTabs({ gender, current, allowed }: AgeClassTabsProps) {
+export function AgeClassTabs({ gender, current, allowed, clubSlug }: AgeClassTabsProps) {
   return (
     <div className="inline-flex items-center rounded-lg bg-muted p-1">
       {allowed.map((ac) => (
         <Link
           key={ac}
-          href={`/${gender}/${ageClassToUrl(ac)}`}
+          href={`/${clubSlug}/players/${gender}/${ac}`}
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             current === ac

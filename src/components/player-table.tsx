@@ -15,7 +15,8 @@ import {
 	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Search } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	useCallback,
 	useEffect,
@@ -33,6 +34,7 @@ import {
 	reorderPlayer,
 	toggleRegistration,
 } from "@/actions/players";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -52,6 +54,8 @@ import {
 	type Gender,
 	type Player,
 } from "@/lib/types";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { AgeClassTabs } from "./age-class-tabs";
 import { PlayerChart } from "./player-chart";
 import { PlayerForm } from "./player-form";
@@ -62,8 +66,11 @@ interface PlayerTableProps {
 	ageClass: AgeClass;
 	initialData: PaginatedPlayers;
 	isAdmin?: boolean;
+	allowedGenders?: Gender[];
 	allowedAgeClasses?: AgeClass[];
 	clubId?: string;
+	clubSlug?: string;
+	parentTeam?: { name: string; href: string };
 }
 
 export function PlayerTable({
@@ -73,14 +80,18 @@ export function PlayerTable({
 	isAdmin = false,
 	allowedAgeClasses,
 	clubId,
+	clubSlug,
+	allowedGenders,
+	parentTeam,
 }: PlayerTableProps) {
 	const [data, setData] = useState<PaginatedPlayers>(initialData);
 	const [registeredUuids, setRegisteredUuids] = useState<Set<string>>(
 		new Set(),
 	);
 	const [hideDeleted, setHideDeleted] = useState(false);
+	const [registrationFilter, setRegistrationFilter] = useState<"all" | "registered" | "unregistered">("all");
 	const [searchQuery, setSearchQuery] = useState("");
-	const ageClassMin = ageClass !== "offen" ? parseInt(ageClass, 10) : 0;
+	const ageClassMin = ageClass !== "all" ? parseInt(ageClass, 10) : 0;
 	const [ageRange, setAgeRange] = useState<[number, number]>([
 		ageClassMin,
 		100,
@@ -279,7 +290,11 @@ export function PlayerTable({
 		};
 	}, [supabase, gender, clubId, realtimeRefresh, refreshRegistrations]);
 
-	const players = allPlayers;
+	const players = registrationFilter === "all"
+		? allPlayers
+		: registrationFilter === "registered"
+			? allPlayers.filter((p) => registeredUuids.has(p.uuid))
+			: allPlayers.filter((p) => !registeredUuids.has(p.uuid));
 	const showRegistration = true;
 
 	async function handleToggleRegistration(
@@ -381,27 +396,88 @@ export function PlayerTable({
 	}
 
 	const genderLabel = GENDER_LABELS[gender];
+	const ageClassLabel = ageClass === "all" ? "" : ` ${ageClass}`;
 
 	return (
 		<div className="space-y-4">
 			{/* Header row */}
-			<div className="flex items-center justify-between">
-				<h2 className="text-xl font-semibold">Meldeliste {genderLabel}</h2>
-				<div className="flex items-center gap-2">
-					{isPending && (
-						<div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-					)}
-					<PlayerForm gender={gender} onDone={doRefresh} isAdmin={isAdmin} />
+			<div>
+				{clubSlug && (
+					<>
+						<nav className="sm:hidden">
+							<Link
+								href={parentTeam?.href ?? `/${clubSlug}/teams`}
+								className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"
+							>
+								<ChevronLeft aria-hidden="true" className="mr-1 -ml-1 h-5 w-5 shrink-0" />
+								{parentTeam?.name ?? "Teams"}
+							</Link>
+						</nav>
+						<nav aria-label="Breadcrumb" className="hidden sm:flex">
+							<ol role="list" className="flex items-center space-x-2">
+								<li className="flex items-center">
+									<Link href={`/${clubSlug}/teams`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
+										Teams
+									</Link>
+								</li>
+								{parentTeam && (
+									<li className="flex items-center">
+										<ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground/60" />
+										<Link href={parentTeam.href} className="ml-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+											{parentTeam.name}
+										</Link>
+									</li>
+								)}
+
+								<li className="flex items-center">
+									<ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground/60" />
+									<span className="ml-2 text-sm font-medium text-muted-foreground">Meldeliste</span>
+								</li>
+							</ol>
+						</nav>
+					</>
+				)}
+				<div className="mt-2 flex items-center justify-between">
+					<h2 className="text-2xl/7 font-bold sm:truncate sm:text-3xl sm:tracking-tight">Meldeliste {genderLabel}{ageClassLabel}</h2>
+					<div className="flex items-center gap-2">
+						{isPending && (
+							<div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+						)}
+						<PlayerForm gender={gender} ageClass={ageClass} onDone={doRefresh} isAdmin={isAdmin} />
+					</div>
 				</div>
 			</div>
 
-			{/* Age class tabs (admin only) */}
-			{allowedAgeClasses && (
-				<AgeClassTabs
-					gender={gender}
-					current={ageClass}
-					allowed={allowedAgeClasses}
-				/>
+			{/* Gender + Age class tabs */}
+			{clubSlug && (allowedGenders || allowedAgeClasses) && (
+				<div className="flex items-center gap-2">
+					{allowedGenders && (
+						<div className="inline-flex items-center rounded-lg bg-muted p-1">
+							{allowedGenders.map((g) => (
+								<Link
+									key={g}
+									href={`/${clubSlug}/players/${g}/all`}
+									className={cn(
+										"rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+										g === gender
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground"
+									)}
+								>
+									{GENDER_LABELS[g]}
+								</Link>
+							))}
+						</div>
+					)}
+					{allowedAgeClasses && (
+						<AgeClassTabs
+							gender={gender}
+							current={ageClass}
+							allowed={allowedAgeClasses}
+							clubSlug={clubSlug}
+						/>
+					)}
+				</div>
 			)}
 
 			{/* Chart (admin only) */}
@@ -415,18 +491,41 @@ export function PlayerTable({
 				/>
 			)}
 
+			{/* Info banner */}
+			<Alert variant="default" className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-600">
+				<TriangleAlert className="h-4 w-4" />
+				<AlertDescription className="text-amber-900">
+					<p>Dies ist eine gemeinsame Meldeliste für alle Mannschaften dieser Altersklasse.</p>
+					<p>Personen, die gemeldet werden sollen, bitte markieren – nicht benötigte einfach abwählen, <strong>nicht löschen</strong>. Nur löschen, wenn die Lizenz entzogen werden soll, z.B. bei Vereinsaustritt.</p>
+				</AlertDescription>
+			</Alert>
+
 			{/* Filters */}
-			<div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-white px-4 py-3">
-				<div className="relative">
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-4 rounded-lg border bg-white px-4 py-3">
+				<div className="relative flex-1 max-w-56 min-w-[140px]">
 					<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
 					<Input
 						placeholder="Name suchen…"
 						value={searchQuery}
 						onChange={(e) => handleSearchChange(e.target.value)}
-						className="w-48 pl-8"
+						className="pl-8"
 					/>
 				</div>
-				<div className="flex items-center gap-3">
+				<Select
+					value={registrationFilter}
+					onValueChange={(v) => setRegistrationFilter(v as typeof registrationFilter)}
+				>
+					<SelectTrigger className="w-auto">
+						<span className="text-muted-foreground mr-1">Status:</span>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="all">Alle</SelectItem>
+						<SelectItem value="registered">Gemeldet</SelectItem>
+						<SelectItem value="unregistered">Nicht gemeldet</SelectItem>
+					</SelectContent>
+				</Select>
+				<div className="flex flex-1 max-w-56 min-w-[140px] items-center gap-2">
 					<Label className="text-sm text-muted-foreground whitespace-nowrap">
 						Alter
 					</Label>
@@ -436,23 +535,22 @@ export function PlayerTable({
 						step={10}
 						value={ageRange}
 						onValueChange={handleAgeRangeChange}
-						className="w-36"
+						className="flex-1"
 					/>
-					<span className="min-w-[4ch] text-sm tabular-nums text-muted-foreground">
+					<span className="text-sm tabular-nums text-muted-foreground">
 						{ageRange[0] === ageClassMin && ageRange[1] === 100
 							? "Alle"
 							: `${ageRange[0]}–${ageRange[1]}`}
 					</span>
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-1.5">
 					<Switch
 						id="hide-deleted"
 						checked={hideDeleted}
-
 						onCheckedChange={handleHideDeletedChange}
 					/>
 					<Label htmlFor="hide-deleted" className="text-sm">
-						Gelöschte ausblenden
+						Gelöschte
 					</Label>
 				</div>
 			</div>
@@ -510,6 +608,7 @@ export function PlayerTable({
 											onToggleRegistration={handleToggleRegistration}
 											isDeleted={!!player.deleted_at}
 											isAdmin={isAdmin}
+											ageClass={ageClass}
 										/>
 									))
 								)}

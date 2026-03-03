@@ -44,7 +44,7 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
     const {
       gender,
       search,
-      ageClass = "offen",
+      ageClass = "all",
       minAge,
       maxAge,
       hideDeleted = false,
@@ -64,7 +64,7 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
       query = query.is("deleted_at", null);
     }
 
-    if (ageClass !== "offen") {
+    if (ageClass !== "all") {
       const ageClassMin = parseInt(ageClass, 10);
       const cutoffYear = new Date().getFullYear() - ageClassMin;
       query = query.lte("birth_date", `${cutoffYear}-12-31`);
@@ -161,7 +161,7 @@ export async function createPlayer(formData: FormData) {
       club_id: clubId,
     });
 
-    revalidatePath(`/${gender}`);
+    revalidatePath("/", "layout");
   });
 }
 
@@ -210,7 +210,7 @@ export async function updatePlayer(formData: FormData) {
       club_id: clubId,
     });
 
-    revalidatePath(`/${gender}`);
+    revalidatePath("/", "layout");
   });
 }
 
@@ -250,7 +250,7 @@ export async function softDeletePlayer(uuid: string, gender: Gender) {
       .delete()
       .eq("player_uuid", uuid);
 
-    revalidatePath(`/${gender}`);
+    revalidatePath("/", "layout");
   });
 }
 
@@ -278,7 +278,7 @@ export async function restorePlayer(uuid: string, gender: Gender) {
       club_id: clubId,
     });
 
-    revalidatePath(`/${gender}`);
+    revalidatePath("/", "layout");
   });
 }
 
@@ -405,7 +405,7 @@ export async function toggleRegistration(
       club_id: clubId,
     });
 
-    revalidatePath(`/${gender}`);
+    revalidatePath("/", "layout");
   });
 }
 
@@ -442,7 +442,7 @@ export async function getPlayerDistributions(filters: {
       query = query.is("deleted_at", null);
     }
 
-    if (ageClass !== "offen") {
+    if (ageClass !== "all") {
       const ageClassMin = parseInt(ageClass, 10);
       const cutoffYear = new Date().getFullYear() - ageClassMin;
       query = query.lte("birth_date", `${cutoffYear}-12-31`);

@@ -9,13 +9,9 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -25,31 +21,24 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // Allow login page and auth routes without auth
   if (pathname === "/login" || pathname.startsWith("/auth/")) {
-    // Set-password needs an authenticated session (invite/recovery token was exchanged)
     if (user && pathname !== "/auth/set-password") {
       const url = request.nextUrl.clone();
-      url.pathname = "/female";
+      url.pathname = "/api/club/resolve";
       return NextResponse.redirect(url);
     }
     return supabaseResponse;
   }
 
-  // Protect all other routes
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Exempt paths that don't need club context
   const exemptPaths = ["/club-select", "/api/club/resolve", "/api/logout"];
   const isExempt = exemptPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 

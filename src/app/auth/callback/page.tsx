@@ -9,7 +9,7 @@ function CallbackHandler() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const supabase = createClient();
-	const next = searchParams.get("next") ?? "/female";
+	const next = searchParams.get("next") ?? "/api/club/resolve";
 
 	useEffect(() => {
 		const code = searchParams.get("code");

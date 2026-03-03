@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Player, Gender } from "@/lib/types";
+import { Player, Gender, AgeClass } from "@/lib/types";
 import { PlayerForm } from "./player-form";
 import { softDeletePlayer, restorePlayer } from "@/actions/players";
 import { getAge } from "@/lib/players";
@@ -33,6 +33,7 @@ interface SortableRowProps {
   onToggleRegistration: (playerUuid: string, registered: boolean) => void;
   isDeleted: boolean;
   isAdmin?: boolean;
+  ageClass?: AgeClass;
 }
 
 export function SortableRow({
@@ -46,6 +47,7 @@ export function SortableRow({
   onToggleRegistration,
   isDeleted,
   isAdmin = false,
+  ageClass,
 }: SortableRowProps) {
   const {
     attributes,
@@ -135,6 +137,7 @@ export function SortableRow({
           <div className="flex justify-end gap-1">
             <PlayerForm
               gender={gender}
+              ageClass={ageClass}
               player={player}
               onDone={onRefresh}
               isAdmin={isAdmin}
@@ -154,7 +157,9 @@ export function SortableRow({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Spieler löschen</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {playerName} wirklich löschen? Bestehende Meldungen werden entfernt.
+                    <strong>{playerName}</strong> wirklich löschen? Bestehende Meldungen werden entfernt. Nur löschen, wenn die Lizenz entzogen werden soll, z.B. bei Vereinsaustritt.
+                    <br /><br />
+                    Wenn die Person nur nicht gemeldet werden soll, stattdessen einfach abwählen (Häkchen entfernen).
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
