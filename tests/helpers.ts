@@ -46,12 +46,13 @@ export async function createTestUserWithEmail(
   // User may already exist from a previous failed run
   if (data.id) return data.id;
   if (data.msg?.includes("already") || data.message?.includes("already")) {
-    const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
       headers: {
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         apikey: SERVICE_ROLE_KEY,
       },
     });
+    expect(listRes.ok).toBeTruthy();
     const listData = await listRes.json();
     const existing = (listData.users ?? []).find(
       (u: { email: string }) => u.email === email,
@@ -122,7 +123,7 @@ export async function createUserProfile(
   expect(res.ok).toBeTruthy();
 
   for (const teamId of ids) {
-    await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
+    const assignRes = await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
@@ -132,6 +133,7 @@ export async function createUserProfile(
       },
       body: JSON.stringify({ user_id: userId, team_id: teamId }),
     });
+    expect(assignRes.ok).toBeTruthy();
   }
 }
 

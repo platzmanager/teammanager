@@ -177,11 +177,6 @@ async function upsert<T>(
 async function inviteCaptain(clubId: string, teamId: string): Promise<void> {
   const email = await prompt("Captain email: ");
 
-  // Check if user already exists in auth
-  const existing = await get<{ id: string }[]>(
-    `/rest/v1/user_profiles?select=id&id=in.(select id from auth.users where email=eq.${encodeURIComponent(email)})`,
-  ).catch(() => [] as { id: string }[]);
-
   let userId: string;
 
   // Try to find existing user via the admin API

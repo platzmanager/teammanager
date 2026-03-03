@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,6 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
   const corePlayers = players.slice(blockedCount, blockedCount + team.team_size);
   const remainingPlayers = players.slice(blockedCount + team.team_size);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteError, setInviteError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   async function handleRemoveCaptain(userId: string) {
@@ -53,14 +53,14 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
 
   function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    setInviteError("");
     startTransition(async () => {
       try {
         const captain = await inviteCaptain(team.id, inviteEmail.trim());
         setCaptains((prev) => [...prev.filter((c) => c.id !== captain.id), captain]);
         setInviteEmail("");
+        toast.success("Mannschaftsführer eingeladen");
       } catch (err) {
-        setInviteError(err instanceof Error ? err.message : "Fehler beim Einladen");
+        toast.error(err instanceof Error ? err.message : "Fehler beim Einladen");
       }
     });
   }
@@ -140,7 +140,6 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
             </Button>
           </form>
         )}
-        {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
       </section>
 
       {/* Registered players */}

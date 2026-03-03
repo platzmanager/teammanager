@@ -26,7 +26,10 @@ export default async function ProtectedLayout({
 	const clubs = await getUserClubs();
 	const currentClubId = await getCurrentClubId();
 	const currentClub = clubs.find((c) => c.id === currentClubId);
-	const clubSlug = currentClub?.slug ?? "";
+	if (!currentClub) {
+		redirect("/api/club/resolve");
+	}
+	const clubSlug = currentClub.slug;
 
 
 	return (

@@ -14,7 +14,7 @@ export async function getTeams() {
   return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase
       .from("teams").select("*").eq("club_id", clubId)
-      .order("gender").order("age_class");
+      .order("gender").order("age_class").order("rank");
     if (error) throw error;
     return data as Team[];
   });
@@ -110,7 +110,12 @@ export async function updateTeam(formData: FormData) {
       age_class: formData.get("age_class") as AgeClass,
       team_size: teamSize,
     };
-    if (rankStr) update.rank = parseInt(rankStr);
+    if (rankStr) {
+      const parsedRank = parseInt(rankStr, 10);
+      if (Number.isFinite(parsedRank) && parsedRank >= 1) {
+        update.rank = parsedRank;
+      }
+    }
     const { error } = await supabase.from("teams").update(update).eq("id", id).eq("club_id", clubId);
     if (error) throw error;
   });
@@ -196,18 +201,21 @@ export async function inviteCaptain(teamId: string, email: string): Promise<{ id
       .eq("id", userId)
       .maybeSingle();
     if (!existingProfile) {
-      await admin.from("user_profiles").insert({ id: userId, role: "captain", team_id: teamId });
+      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain", team_id: teamId });
+      if (profileError) throw new Error("Profil konnte nicht erstellt werden");
     }
 
     // Upsert team assignment
-    await admin
+    const { error: assignmentError } = await admin
       .from("user_team_assignments")
       .upsert({ user_id: userId, team_id: teamId }, { onConflict: "user_id,team_id" });
+    if (assignmentError) throw new Error("Team-Zuordnung fehlgeschlagen");
 
     // Upsert club membership
-    await admin
+    const { error: clubError } = await admin
       .from("user_clubs")
       .upsert({ user_id: userId, club_id: clubId }, { onConflict: "user_id,club_id" });
+    if (clubError) throw new Error("Vereins-Zuordnung fehlgeschlagen");
 
     return { id: userId, email };
   });
