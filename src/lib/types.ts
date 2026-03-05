@@ -55,6 +55,23 @@ export interface Team {
   slug: string;
   team_size: number;
   rank: number;
+  league_class: string | null;
+  league: string | null;
+  league_group: string | null;
+  created_at: string;
+}
+
+export interface Match {
+  id: string;
+  team_id: string;
+  club_id: string;
+  match_date: string;
+  match_time: string | null;
+  is_home: boolean;
+  home_team: string;
+  away_team: string;
+  match_number: string | null;
+  location: string | null;
   created_at: string;
 }
 

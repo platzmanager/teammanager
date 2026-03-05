@@ -11,7 +11,7 @@ export async function createTestUser(): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
     },
@@ -33,7 +33,7 @@ export async function createTestUserWithEmail(
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
     },
@@ -48,7 +48,7 @@ export async function createTestUserWithEmail(
   if (data.msg?.includes("already") || data.message?.includes("already")) {
     const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         apikey: SERVICE_ROLE_KEY,
       },
     });
@@ -68,7 +68,7 @@ export async function deleteTestUser(userId: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },
@@ -76,7 +76,7 @@ export async function deleteTestUser(userId: string) {
   await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
     },
   });
@@ -113,7 +113,7 @@ export async function createUserProfile(
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal,resolution=merge-duplicates",
@@ -126,7 +126,7 @@ export async function createUserProfile(
     const assignRes = await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         "Content-Type": "application/json",
         apikey: SERVICE_ROLE_KEY,
         Prefer: "return=minimal,resolution=merge-duplicates",
@@ -141,7 +141,7 @@ export async function deleteUserProfile(userId: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },
@@ -149,7 +149,7 @@ export async function deleteUserProfile(userId: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },
@@ -167,7 +167,7 @@ export async function createClubViaApi(
     `${SUPABASE_URL}/rest/v1/clubs?slug=eq.${slug}&select=id`,
     {
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         apikey: SERVICE_ROLE_KEY,
       },
     },
@@ -180,7 +180,7 @@ export async function createClubViaApi(
   const res = await fetch(`${SUPABASE_URL}/rest/v1/clubs`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=representation",
@@ -196,7 +196,7 @@ export async function deleteClubViaApi(id: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/clubs?id=eq.${id}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },
@@ -207,7 +207,7 @@ export async function addUserToClub(userId: string, clubId: string) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_clubs`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal,resolution=merge-duplicates",
@@ -223,7 +223,7 @@ export async function removeUserFromClub(userId: string, clubId: string) {
     {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         apikey: SERVICE_ROLE_KEY,
         Prefer: "return=minimal",
       },
@@ -244,7 +244,7 @@ export async function createTeamViaApi(
     `${SUPABASE_URL}/rest/v1/teams?name=eq.${encodeURIComponent(name)}&club_id=eq.${clubId}&select=id`,
     {
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         apikey: SERVICE_ROLE_KEY,
       },
     },
@@ -257,7 +257,7 @@ export async function createTeamViaApi(
     `${SUPABASE_URL}/rest/v1/teams?club_id=eq.${clubId}&gender=eq.${gender}&age_class=eq.${ageClass}&select=rank&order=rank.desc&limit=1`,
     {
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  
         apikey: SERVICE_ROLE_KEY,
       },
     },
@@ -268,7 +268,7 @@ export async function createTeamViaApi(
   const res = await fetch(`${SUPABASE_URL}/rest/v1/teams`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=representation",
@@ -291,7 +291,7 @@ export async function deleteTeamViaApi(id: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/teams?id=eq.${id}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },
@@ -313,7 +313,7 @@ export async function createPlayerViaApi(
   const res = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=representation",
@@ -341,7 +341,7 @@ export async function inviteUser(email: string) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       "Content-Type": "application/json",
       apikey: SERVICE_ROLE_KEY,
     },
@@ -396,7 +396,7 @@ export async function cleanupPlayers(clubId?: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/players?${filter}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+
       apikey: SERVICE_ROLE_KEY,
       Prefer: "return=minimal",
     },

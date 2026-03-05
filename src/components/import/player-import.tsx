@@ -80,7 +80,7 @@ interface DeleteResult {
   total: number;
 }
 
-export function CsvImport() {
+export function PlayerImport() {
   const [rows, setRows] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);

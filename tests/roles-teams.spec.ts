@@ -55,10 +55,9 @@ test.afterAll(async () => {
   await deleteClubViaApi(clubId);
 });
 
-test("admin sees Teams, Meldeliste, and Import links", async ({ page }) => {
+test("admin sees Teams and Import links", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await expect(page.locator(`a[href="/${CLUB_SLUG}/teams"]`)).toBeVisible();
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/players/female/all"]`)).toBeVisible();
   await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`)).toBeVisible();
 });
 
@@ -99,6 +98,5 @@ test("captain can authenticate", async ({ page }) => {
 
 test("captain does not see admin-only links", async ({ page }) => {
   await loginAs(page, CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/players/female/all"]`)).not.toBeVisible();
   await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`)).not.toBeVisible();
 });

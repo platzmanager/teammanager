@@ -271,3 +271,17 @@ export async function removeCaptain(teamId: string, userId: string) {
     if (error) throw error;
   });
 }
+
+export async function getTeamMatches(teamId: string) {
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("matches")
+      .select("*")
+      .eq("team_id", teamId)
+      .eq("club_id", clubId)
+      .order("match_date")
+      .order("match_time");
+    if (error) throw error;
+    return (data ?? []) as import("@/lib/types").Match[];
+  });
+}
