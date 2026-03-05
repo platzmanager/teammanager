@@ -7,7 +7,7 @@ import { getTeams } from "@/actions/teams";
 import { getCurrentClubId } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
-const validAgeClasses: AgeClass[] = ["all", "30", "40", "50", "60"];
+const validAgeClasses: AgeClass[] = ["all", "30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"];
 
 export default async function GenderAgeClassPage({
   params,

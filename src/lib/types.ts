@@ -4,7 +4,29 @@ export const GENDER_LABELS: Record<Gender, string> = {
   female: "Damen",
   male: "Herren",
 };
-export type AgeClass = "all" | "30" | "40" | "50" | "60";
+export type AgeClass = "all" | "30" | "40" | "50" | "60" | "u9" | "u10" | "u12" | "u15" | "u18";
+
+export interface AgeClassInfo {
+  label: string;
+  isYouth: boolean;
+  isMixed: boolean;
+  maxAge?: number;
+  minAge?: number;
+  youthGenderLabels?: { male: string; female: string };
+}
+
+export const AGE_CLASS_CONFIG: Record<AgeClass, AgeClassInfo> = {
+  all: { label: "Alle", isYouth: false, isMixed: false },
+  "30": { label: "30", isYouth: false, isMixed: false, minAge: 30 },
+  "40": { label: "40", isYouth: false, isMixed: false, minAge: 40 },
+  "50": { label: "50", isYouth: false, isMixed: false, minAge: 50 },
+  "60": { label: "60", isYouth: false, isMixed: false, minAge: 60 },
+  u9: { label: "Kleinfeld U9", isYouth: true, isMixed: true, maxAge: 9 },
+  u10: { label: "Midcourt U10", isYouth: true, isMixed: true, maxAge: 10 },
+  u12: { label: "Bambini U12", isYouth: true, isMixed: true, maxAge: 12 },
+  u15: { label: "U15", isYouth: true, isMixed: false, maxAge: 15, youthGenderLabels: { male: "Knaben", female: "Mädchen" } },
+  u18: { label: "U18", isYouth: true, isMixed: false, maxAge: 18, youthGenderLabels: { male: "Junioren", female: "Juniorinnen" } },
+};
 export type UserRole = "admin" | "captain" | "player";
 
 export interface Club {

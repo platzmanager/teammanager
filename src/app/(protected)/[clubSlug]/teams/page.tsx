@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Team, Gender, GENDER_LABELS, UserProfile } from "@/lib/types";
+import { Team, Gender, GENDER_LABELS, AGE_CLASS_CONFIG, UserProfile } from "@/lib/types";
 import { getTeams, getSessionProfile, getRegistrationCounts } from "@/actions/teams";
 import { TeamForm } from "@/components/team-form";
 
@@ -122,7 +122,7 @@ export default function TeamsPage() {
                   >
                     <TableCell className="font-medium">{team.name}</TableCell>
                     <TableCell>{GENDER_LABELS[team.gender]}</TableCell>
-                    <TableCell>{team.age_class === "all" ? "Alle" : team.age_class}</TableCell>
+                    <TableCell>{AGE_CLASS_CONFIG[team.age_class]?.label ?? team.age_class}</TableCell>
                     <TableCell className="text-center">
                       {(() => {
                         const available = getTeamAvailableCount(team);

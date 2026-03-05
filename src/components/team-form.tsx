@@ -12,14 +12,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Team, Gender, AgeClass, GENDER_LABELS } from "@/lib/types";
+import { Team, Gender, AgeClass, GENDER_LABELS, AGE_CLASS_CONFIG } from "@/lib/types";
 import { createTeam, updateTeam, getNextRank } from "@/actions/teams";
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 function buildName(gender: string, ageClass: string, rank: number): string {
-  const genderLabel = GENDER_LABELS[gender as keyof typeof GENDER_LABELS] ?? gender;
   const numeral = ROMAN[rank - 1] ?? String(rank);
+  const config = AGE_CLASS_CONFIG[ageClass as AgeClass];
+  if (config?.isYouth) {
+    if (config.isMixed) {
+      return `${config.label} ${numeral}`;
+    }
+    const label = config.youthGenderLabels?.[gender as Gender] ?? config.label;
+    return `${label} ${config.label.split(" ").pop()} ${numeral}`;
+  }
+  const genderLabel = GENDER_LABELS[gender as keyof typeof GENDER_LABELS] ?? gender;
   const base = ageClass === "all" ? genderLabel : `${genderLabel} ${ageClass}`;
   return `${base} ${numeral}`;
 }
@@ -54,7 +62,10 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
 
   function handleAgeClassChange(v: string) {
     setAgeClass(v as typeof ageClass);
-    if (!nameManuallyEdited.current) fetchAndSetName(gender, v);
+    const config = AGE_CLASS_CONFIG[v as AgeClass];
+    const effectiveGender = config?.isMixed ? "male" : gender;
+    if (config?.isMixed) setGender("male");
+    if (!nameManuallyEdited.current) fetchAndSetName(effectiveGender, v);
   }
 
   function handleOpen(isOpen: boolean) {
@@ -107,7 +118,28 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
         </SheetHeader>
         <div className="px-6 pb-6">
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="age_class">Altersklasse</Label>
+              <input type="hidden" name="age_class" value={ageClass} />
+              <Select value={ageClass} onValueChange={handleAgeClassChange}>
+                <SelectTrigger id="age_class" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="40">40</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="60">60</SelectItem>
+                  <SelectItem value="u18">U18</SelectItem>
+                  <SelectItem value="u15">U15</SelectItem>
+                  <SelectItem value="u12">Bambini U12</SelectItem>
+                  <SelectItem value="u10">Midcourt U10</SelectItem>
+                  <SelectItem value="u9">Kleinfeld U9</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!AGE_CLASS_CONFIG[ageClass]?.isMixed && (
               <div className="space-y-1.5">
                 <Label htmlFor="gender">Geschlecht</Label>
                 <input type="hidden" name="gender" value={gender} />
@@ -116,28 +148,13 @@ export function TeamForm({ team, trigger, onDone }: TeamFormProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Herren</SelectItem>
-                    <SelectItem value="female">Damen</SelectItem>
+                    <SelectItem value="male">{AGE_CLASS_CONFIG[ageClass]?.youthGenderLabels?.male ?? "Herren"}</SelectItem>
+                    <SelectItem value="female">{AGE_CLASS_CONFIG[ageClass]?.youthGenderLabels?.female ?? "Damen"}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="age_class">Altersklasse</Label>
-                <input type="hidden" name="age_class" value={ageClass} />
-                <Select value={ageClass} onValueChange={handleAgeClassChange}>
-                  <SelectTrigger id="age_class" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle</SelectItem>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="40">40</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="60">60</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            )}
+            {AGE_CLASS_CONFIG[ageClass]?.isMixed && <input type="hidden" name="gender" value="male" />}
             <div className="space-y-1.5">
               <Label htmlFor="name">Name</Label>
               <Input
