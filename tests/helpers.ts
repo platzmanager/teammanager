@@ -4,17 +4,22 @@ import type { Page } from "@playwright/test";
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321";
 export const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+const serviceHeaders = () => ({
+  Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  apikey: SERVICE_ROLE_KEY,
+});
+const serviceHeadersJson = () => ({
+  ...serviceHeaders(),
+  "Content-Type": "application/json",
+});
+
 export const TEST_EMAIL = "playwright@test.local";
 export const TEST_PASSWORD = "test123456";
 
 export async function createTestUser(): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-    },
+    headers: serviceHeadersJson(),
     body: JSON.stringify({
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
@@ -32,11 +37,7 @@ export async function createTestUserWithEmail(
 ): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-    },
+    headers: serviceHeadersJson(),
     body: JSON.stringify({ email, password, email_confirm: true }),
   });
   const data = await res.json();
@@ -47,10 +48,7 @@ export async function createTestUserWithEmail(
   if (data.id) return data.id;
   if (data.msg?.includes("already") || data.message?.includes("already")) {
     const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
-      headers: {
-  
-        apikey: SERVICE_ROLE_KEY,
-      },
+      headers: serviceHeaders(),
     });
     expect(listRes.ok).toBeTruthy();
     const listData = await listRes.json();
@@ -67,18 +65,11 @@ export async function createTestUserWithEmail(
 export async function deleteTestUser(userId: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
   await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-    },
+    headers: serviceHeaders(),
   });
 }
 
@@ -109,15 +100,9 @@ export async function createUserProfile(
 ) {
   const body: Record<string, string> = { id: userId, role };
   const ids = teamIds ? (Array.isArray(teamIds) ? teamIds : [teamIds]) : [];
-  if (ids.length > 0) body.team_id = ids[0];
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal,resolution=merge-duplicates",
-    },
+    headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
     body: JSON.stringify(body),
   });
   expect(res.ok).toBeTruthy();
@@ -125,12 +110,7 @@ export async function createUserProfile(
   for (const teamId of ids) {
     const assignRes = await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
       method: "POST",
-      headers: {
-  
-        "Content-Type": "application/json",
-        apikey: SERVICE_ROLE_KEY,
-        Prefer: "return=minimal,resolution=merge-duplicates",
-      },
+      headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
       body: JSON.stringify({ user_id: userId, team_id: teamId }),
     });
     expect(assignRes.ok).toBeTruthy();
@@ -140,19 +120,11 @@ export async function createUserProfile(
 export async function deleteUserProfile(userId: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
   await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
 }
 
@@ -165,12 +137,7 @@ export async function createClubViaApi(
   // Check if club already exists (leftover from a previous run)
   const existing = await fetch(
     `${SUPABASE_URL}/rest/v1/clubs?slug=eq.${slug}&select=id`,
-    {
-      headers: {
-  
-        apikey: SERVICE_ROLE_KEY,
-      },
-    },
+    { headers: serviceHeaders() },
   );
   const existingData = await existing.json();
   if (existingData[0]?.id) {
@@ -179,12 +146,7 @@ export async function createClubViaApi(
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/clubs`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=representation",
-    },
+    headers: { ...serviceHeadersJson(), Prefer: "return=representation" },
     body: JSON.stringify({ name, slug }),
   });
   const data = await res.json();
@@ -195,23 +157,14 @@ export async function createClubViaApi(
 export async function deleteClubViaApi(id: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/clubs?id=eq.${id}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
 }
 
 export async function addUserToClub(userId: string, clubId: string) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_clubs`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal,resolution=merge-duplicates",
-    },
+    headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
     body: JSON.stringify({ user_id: userId, club_id: clubId }),
   });
   expect(res.ok).toBeTruthy();
@@ -222,11 +175,7 @@ export async function removeUserFromClub(userId: string, clubId: string) {
     `${SUPABASE_URL}/rest/v1/user_clubs?user_id=eq.${userId}&club_id=eq.${clubId}`,
     {
       method: "DELETE",
-      headers: {
-  
-        apikey: SERVICE_ROLE_KEY,
-        Prefer: "return=minimal",
-      },
+      headers: { ...serviceHeaders(), Prefer: "return=minimal" },
     },
   );
 }
@@ -242,12 +191,7 @@ export async function createTeamViaApi(
   // Check if team already exists
   const existing = await fetch(
     `${SUPABASE_URL}/rest/v1/teams?name=eq.${encodeURIComponent(name)}&club_id=eq.${clubId}&select=id`,
-    {
-      headers: {
-  
-        apikey: SERVICE_ROLE_KEY,
-      },
-    },
+    { headers: serviceHeaders() },
   );
   const existingData = await existing.json();
   if (existingData[0]?.id) return existingData[0].id;
@@ -255,24 +199,14 @@ export async function createTeamViaApi(
   // Get next rank for this group
   const rankRes = await fetch(
     `${SUPABASE_URL}/rest/v1/teams?club_id=eq.${clubId}&gender=eq.${gender}&age_class=eq.${ageClass}&select=rank&order=rank.desc&limit=1`,
-    {
-      headers: {
-  
-        apikey: SERVICE_ROLE_KEY,
-      },
-    },
+    { headers: serviceHeaders() },
   );
   const rankData = await rankRes.json();
   const nextRank = ((rankData[0]?.rank as number) ?? 0) + 1;
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/teams`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=representation",
-    },
+    headers: { ...serviceHeadersJson(), Prefer: "return=representation" },
     body: JSON.stringify({
       name,
       gender,
@@ -290,11 +224,7 @@ export async function createTeamViaApi(
 export async function deleteTeamViaApi(id: string) {
   await fetch(`${SUPABASE_URL}/rest/v1/teams?id=eq.${id}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
 }
 
@@ -312,12 +242,7 @@ export async function createPlayerViaApi(
 ): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=representation",
-    },
+    headers: { ...serviceHeadersJson(), Prefer: "return=representation" },
     body: JSON.stringify({
       ...player,
       club_id: clubId,
@@ -340,11 +265,7 @@ export async function deleteAllEmails() {
 export async function inviteUser(email: string) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
     method: "POST",
-    headers: {
-
-      "Content-Type": "application/json",
-      apikey: SERVICE_ROLE_KEY,
-    },
+    headers: serviceHeadersJson(),
     body: JSON.stringify({
       email,
       data: {},
@@ -395,10 +316,6 @@ export async function cleanupPlayers(clubId?: string) {
     : `uuid=neq.00000000-0000-0000-0000-000000000000`;
   await fetch(`${SUPABASE_URL}/rest/v1/players?${filter}`, {
     method: "DELETE",
-    headers: {
-
-      apikey: SERVICE_ROLE_KEY,
-      Prefer: "return=minimal",
-    },
+    headers: { ...serviceHeaders(), Prefer: "return=minimal" },
   });
 }
