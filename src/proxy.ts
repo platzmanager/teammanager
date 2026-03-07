@@ -35,6 +35,10 @@ export async function proxy(request: NextRequest) {
     return response;
   };
 
+  if (pathname.startsWith("/join/")) {
+    return supabaseResponse;
+  }
+
   if (pathname === "/login" || pathname.startsWith("/auth/")) {
     if (user && pathname !== "/auth/set-password") {
       return redirectTo("/api/club/resolve");

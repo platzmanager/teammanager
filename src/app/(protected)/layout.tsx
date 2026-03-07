@@ -45,13 +45,27 @@ export default async function ProtectedLayout({
 							>
 								Teams
 							</Link>
+							<Link
+								href={`/${clubSlug}/events`}
+								className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+							>
+								Termine
+							</Link>
 								{isAdmin && (
+								<>
+								<Link
+									href={`/${clubSlug}/admin/members`}
+									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+								>
+									Mitglieder
+								</Link>
 								<Link
 									href={`/${clubSlug}/admin/import`}
 									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
 								>
 									Import
 								</Link>
+								</>
 							)}
 						</nav>
 						<UserMenu

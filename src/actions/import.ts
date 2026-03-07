@@ -2,8 +2,9 @@
 
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { Gender } from "@/lib/types";
+import { Gender, Match } from "@/lib/types";
 import { withClubContext } from "@/lib/club";
+import { createMatchOccurrences } from "@/actions/events";
 
 interface ImportPlayer {
   first_name: string;
@@ -465,6 +466,19 @@ export async function importSchedule(
       user_id: user?.id ?? null,
       club_id: clubId,
     });
+
+    // Create event occurrences for imported matches
+    for (const teamId of teamsToDelete) {
+      const { data: teamMatches } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("team_id", teamId)
+        .eq("club_id", clubId)
+        .order("match_date");
+      if (teamMatches && teamMatches.length > 0) {
+        await createMatchOccurrences(teamId, teamMatches as Match[], { supabase, clubId });
+      }
+    }
 
     revalidatePath("/", "layout");
 
