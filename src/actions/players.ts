@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Gender, AgeClass } from "@/lib/types";
+import { Gender, AgeClass, AGE_CLASS_CONFIG } from "@/lib/types";
 import { requireRole, requireAdmin, canAccessGender } from "@/lib/auth";
 import { withClubContext } from "@/lib/club";
 
@@ -65,9 +65,14 @@ export async function getFilteredPlayers(filters: PlayerFilters): Promise<Pagina
     }
 
     if (ageClass !== "all") {
-      const ageClassMin = parseInt(ageClass, 10);
-      const cutoffYear = new Date().getFullYear() - ageClassMin;
-      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+      const config = AGE_CLASS_CONFIG[ageClass];
+      if (config.isYouth && config.maxAge != null) {
+        const minBirthYear = new Date().getFullYear() - config.maxAge;
+        query = query.gte("birth_date", `${minBirthYear}-01-01`);
+      } else if (config.minAge != null) {
+        const cutoffYear = new Date().getFullYear() - config.minAge;
+        query = query.lte("birth_date", `${cutoffYear}-12-31`);
+      }
     }
 
     if (minAge) {
@@ -443,9 +448,14 @@ export async function getPlayerDistributions(filters: {
     }
 
     if (ageClass !== "all") {
-      const ageClassMin = parseInt(ageClass, 10);
-      const cutoffYear = new Date().getFullYear() - ageClassMin;
-      query = query.lte("birth_date", `${cutoffYear}-12-31`);
+      const config = AGE_CLASS_CONFIG[ageClass];
+      if (config.isYouth && config.maxAge != null) {
+        const minBirthYear = new Date().getFullYear() - config.maxAge;
+        query = query.gte("birth_date", `${minBirthYear}-01-01`);
+      } else if (config.minAge != null) {
+        const cutoffYear = new Date().getFullYear() - config.minAge;
+        query = query.lte("birth_date", `${cutoffYear}-12-31`);
+      }
     }
 
     if (minAge) {

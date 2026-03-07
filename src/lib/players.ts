@@ -1,4 +1,4 @@
-import { Player, AgeClass } from "./types";
+import { Player, AgeClass, AGE_CLASS_CONFIG } from "./types";
 
 export function getAge(birthDate: string): number {
   const birthYear = new Date(birthDate).getFullYear();
@@ -8,8 +8,14 @@ export function getAge(birthDate: string): number {
 
 export function filterByAgeClass(players: Player[], ageClass: AgeClass): Player[] {
   if (ageClass === "all") return players;
-  const minAge = parseInt(ageClass, 10);
-  return players.filter((p) => getAge(p.birth_date) >= minAge);
+  const config = AGE_CLASS_CONFIG[ageClass];
+  if (config.isYouth && config.maxAge != null) {
+    return players.filter((p) => getAge(p.birth_date) <= config.maxAge!);
+  }
+  if (config.minAge != null) {
+    return players.filter((p) => getAge(p.birth_date) >= config.minAge!);
+  }
+  return players;
 }
 
 export function sortPlayers(players: Player[]): Player[] {

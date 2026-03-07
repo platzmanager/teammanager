@@ -201,7 +201,7 @@ export async function inviteCaptain(teamId: string, email: string): Promise<{ id
       .eq("id", userId)
       .maybeSingle();
     if (!existingProfile) {
-      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain", team_id: teamId });
+      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain" });
       if (profileError) throw new Error("Profil konnte nicht erstellt werden");
     }
 
@@ -269,5 +269,19 @@ export async function removeCaptain(teamId: string, userId: string) {
       .eq("user_id", userId)
       .eq("team_id", teamId);
     if (error) throw error;
+  });
+}
+
+export async function getTeamMatches(teamId: string) {
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("matches")
+      .select("*")
+      .eq("team_id", teamId)
+      .eq("club_id", clubId)
+      .order("match_date")
+      .order("match_time");
+    if (error) throw error;
+    return (data ?? []) as import("@/lib/types").Match[];
   });
 }

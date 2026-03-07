@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MapPin, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Team, Player } from "@/lib/types";
+import { Team, Player, Match } from "@/lib/types";
 import { getAge } from "@/lib/players";
 import {
   Table,
@@ -29,11 +29,22 @@ interface TeamDetailClientProps {
   captains: Captain[];
   players: Player[];
   blockedCount: number;
+  matches: Match[];
   isAdmin: boolean;
   clubSlug: string;
 }
 
-export function TeamDetailClient({ team, captains: initialCaptains, players, blockedCount, isAdmin, clubSlug }: TeamDetailClientProps) {
+function formatDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatTime(t: string | null) {
+  if (!t) return null;
+  return t.slice(0, 5) + " Uhr";
+}
+
+export function TeamDetailClient({ team, captains: initialCaptains, players, blockedCount, matches, isAdmin, clubSlug }: TeamDetailClientProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [captains, setCaptains] = useState(initialCaptains);
   const [showBlocked, setShowBlocked] = useState(false);
@@ -225,10 +236,40 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
         )}
       </section>
 
-      {/* Events placeholder */}
+      {/* Spieltage */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Spieltage & Training</h3>
-        <p className="text-sm text-muted-foreground">Noch keine Spieltage oder Trainings geplant.</p>
+        <h3 className="text-lg font-semibold">Spieltage ({matches.length})</h3>
+        {matches.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Noch keine Spieltage geplant.</p>
+        ) : (
+          <div className="space-y-2">
+            {matches.map((match) => (
+              <div key={match.id} className="flex items-start gap-3 rounded-md border bg-white px-4 py-3">
+                <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-sm font-medium">
+                      {match.home_team} – {match.away_team}
+                    </span>
+                    {match.is_home && (
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Heim</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    <span>{formatDate(match.match_date)}{match.match_time ? `, ${formatTime(match.match_time)}` : ""}</span>
+                    {match.location && (
+                      <span className="flex items-center gap-0.5">
+                        <MapPin className="h-3 w-3" />
+                        {match.location}
+                      </span>
+                    )}
+                    {match.match_number && <span>Spiel-Nr. {match.match_number}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {isAdmin && (

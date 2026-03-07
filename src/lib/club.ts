@@ -23,6 +23,16 @@ export async function withClubContext<T>(
   return fn(supabase, clubId);
 }
 
+export async function getLastAgeClass(gender: string): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(`last_age_class_${gender}`)?.value ?? null;
+}
+
+export async function setLastAgeClass(gender: string, ageClass: string): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(`last_age_class_${gender}`, ageClass, { maxAge: 60 * 60 * 24 * 365 });
+}
+
 export async function getClubSlug(): Promise<string> {
   const clubId = await requireClubId();
   const supabase = await createClient();

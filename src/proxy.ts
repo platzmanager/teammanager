@@ -24,28 +24,33 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
+  const redirectTo = (path: string) => {
+    const url = request.nextUrl.clone();
+    url.pathname = path;
+    const response = NextResponse.redirect(url);
+    // Copy auth cookies from supabaseResponse so token refreshes are not lost
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return response;
+  };
+
   if (pathname === "/login" || pathname.startsWith("/auth/")) {
     if (user && pathname !== "/auth/set-password") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/api/club/resolve";
-      return NextResponse.redirect(url);
+      return redirectTo("/api/club/resolve");
     }
     return supabaseResponse;
   }
 
   if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectTo("/login");
   }
 
   const exemptPaths = ["/club-select", "/api/club/resolve", "/api/logout"];
   const isExempt = exemptPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (!isExempt && !request.cookies.get("current_club_id")?.value) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/api/club/resolve";
-    return NextResponse.redirect(url);
+    return redirectTo("/api/club/resolve");
   }
 
   return supabaseResponse;

@@ -19,7 +19,6 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   return {
     id: data.id,
     role: data.role,
-    team_id: data.team_id,
     player_uuid: data.player_uuid,
     teams,
     created_at: data.created_at,
@@ -50,12 +49,12 @@ export function canAccessTeamScope(profile: UserProfile, gender: Gender, ageClas
 }
 
 export function getUserAgeClasses(profile: UserProfile, gender: Gender): AgeClass[] {
-  if (profile.role === "admin") return ["all", "30", "40", "50", "60"];
+  if (profile.role === "admin") return ["all", "30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"];
   const ageClasses = new Set<AgeClass>();
   profile.teams?.forEach((t) => {
     if (t.gender === gender) ageClasses.add(t.age_class);
   });
-  return (["30", "40", "50", "60"] as AgeClass[]).filter((ac) => ageClasses.has(ac));
+  return (["30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"] as AgeClass[]).filter((ac) => ageClasses.has(ac));
 }
 
 export function getDefaultPath(profile: UserProfile, clubSlug: string): string {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { AgeClass, Gender } from "@/lib/types";
+import { AgeClass, Gender, AGE_CLASS_CONFIG } from "@/lib/types";
 
 interface AgeClassTabsProps {
   gender: Gender;
@@ -17,6 +17,11 @@ const ageClassLabels: Record<AgeClass, string> = {
   "40": "40",
   "50": "50",
   "60": "60",
+  u9: "U9",
+  u10: "U10",
+  u12: "U12",
+  u15: "U15",
+  u18: "U18",
 };
 
 export function AgeClassTabs({ gender, current, allowed, clubSlug }: AgeClassTabsProps) {

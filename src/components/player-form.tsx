@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Player, Gender, AgeClass } from "@/lib/types";
+import { Player, Gender, AgeClass, AGE_CLASS_CONFIG } from "@/lib/types";
 import { createPlayer, updatePlayer } from "@/actions/players";
 
 interface PlayerFormProps {
@@ -41,10 +41,17 @@ export function PlayerForm({ gender, ageClass, player, trigger, onDone, isAdmin 
     const birthYear = new Date(date).getFullYear();
     const currentYear = new Date().getFullYear();
     const age = currentYear - birthYear;
-    const minAge = parseInt(ageClass, 10);
-    if (age < minAge) {
-      setBirthDateError(`Altersklasse ${ageClass} erfordert ein Mindestalter von ${minAge} Jahren (aktuell ${age})`);
-      return false;
+    const config = AGE_CLASS_CONFIG[ageClass];
+    if (config.isYouth && config.maxAge != null) {
+      if (age > config.maxAge) {
+        setBirthDateError(`Altersklasse ${config.label} erfordert ein Höchstalter von ${config.maxAge} Jahren (aktuell ${age})`);
+        return false;
+      }
+    } else if (config.minAge != null) {
+      if (age < config.minAge) {
+        setBirthDateError(`Altersklasse ${ageClass} erfordert ein Mindestalter von ${config.minAge} Jahren (aktuell ${age})`);
+        return false;
+      }
     }
     setBirthDateError(null);
     return true;
