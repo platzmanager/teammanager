@@ -41,7 +41,6 @@ interface ScheduleResult {
   imported: number;
   teamsEnriched: number;
   skipped: { reason: string }[];
-  ambiguous: string[];
 }
 
 function parseAltersklasse(raw: string): { gender: "male" | "female"; age_class: string } {

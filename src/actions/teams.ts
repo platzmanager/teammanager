@@ -201,7 +201,7 @@ export async function inviteCaptain(teamId: string, email: string): Promise<{ id
       .eq("id", userId)
       .maybeSingle();
     if (!existingProfile) {
-      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain", team_id: teamId });
+      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain" });
       if (profileError) throw new Error("Profil konnte nicht erstellt werden");
     }
 

@@ -243,11 +243,15 @@ export async function importSkillLevels(rows: LkRow[]) {
     const backfilledList: { name: string; license: string }[] = [];
 
     // Fetch all players for this club
-    const { data: allPlayers } = await supabase
+    const { data: allPlayers, error: playersError } = await supabase
       .from("players")
       .select("uuid, first_name, last_name, birth_date, license, skill_level")
       .eq("club_id", clubId)
       .is("deleted_at", null);
+
+    if (playersError) {
+      throw new Error(`Fehler beim Laden der Spieler: ${playersError.message}`);
+    }
 
     const players = allPlayers ?? [];
 
@@ -299,7 +303,10 @@ export async function importSkillLevels(rows: LkRow[]) {
         continue;
       }
 
-      await supabase.from("players").update(updateData).eq("uuid", player.uuid);
+      const { error: updateError } = await supabase.from("players").update(updateData).eq("uuid", player.uuid);
+      if (updateError) {
+        throw new Error(`Fehler beim Aktualisieren von ${name}: ${updateError.message}`);
+      }
       updated++;
       if (needsBackfill && row.license) backfilledList.push({ name, license: row.license });
     }
@@ -345,10 +352,13 @@ export async function importSchedule(
     const { data: { user } } = await supabase.auth.getUser();
 
     // Fetch teams for this club
-    const { data: allTeams } = await supabase
+    const { data: allTeams, error: teamsError } = await supabase
       .from("teams")
       .select("id, gender, age_class, league_class, league, league_group")
       .eq("club_id", clubId);
+    if (teamsError) {
+      throw new Error(`Fehler beim Laden der Mannschaften: ${teamsError.message}`);
+    }
     const teams = allTeams ?? [];
 
     // Build resolved mapping: gender|age_class → team_id
@@ -367,7 +377,6 @@ export async function importSchedule(
     }
 
     const skipped: { reason: string }[] = [];
-    const ambiguous: string[] = [];
     const matchInserts: Record<string, unknown>[] = [];
     const teamEnrichments: Record<string, { league_class: string; league: string; league_group: string }> = {};
     const teamsToDelete = new Set<string>();
@@ -410,7 +419,10 @@ export async function importSchedule(
 
     // Delete existing matches for affected teams (full replace)
     for (const teamId of teamsToDelete) {
-      await supabase.from("matches").delete().eq("team_id", teamId).eq("club_id", clubId);
+      const { error: deleteError } = await supabase.from("matches").delete().eq("team_id", teamId).eq("club_id", clubId);
+      if (deleteError) {
+        throw new Error("Datenbankfehler beim Löschen bestehender Spiele.");
+      }
     }
 
     // Insert matches in batches
@@ -438,7 +450,10 @@ export async function importSchedule(
         team.league_group !== enrichment.league_group;
 
       if (needsUpdate) {
-        await supabase.from("teams").update(enrichment).eq("id", teamId);
+        const { error: enrichError } = await supabase.from("teams").update(enrichment).eq("id", teamId);
+        if (enrichError) {
+          throw new Error("Datenbankfehler beim Aktualisieren der Mannschaften.");
+        }
         teamsEnriched++;
       }
     }
@@ -453,6 +468,6 @@ export async function importSchedule(
 
     revalidatePath("/", "layout");
 
-    return { imported, teamsEnriched, skipped, ambiguous };
+    return { imported, teamsEnriched, skipped };
   });
 }

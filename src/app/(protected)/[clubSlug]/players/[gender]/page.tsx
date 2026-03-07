@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Gender } from "@/lib/types";
-import { getUserProfile, canAccessGender, getDefaultPath } from "@/lib/auth";
+import { getUserProfile, canAccessGender, getUserAgeClasses, getDefaultPath } from "@/lib/auth";
+import { getLastAgeClass } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
 
@@ -18,5 +19,12 @@ export default async function GenderPage({
     redirect(getDefaultPath(profile, clubSlug));
   }
 
-  redirect(`/${clubSlug}/players/${gender}/all`);
+  if (profile.role === "admin") {
+    redirect(`/${clubSlug}/players/${gender}/all`);
+  }
+
+  const allowed = getUserAgeClasses(profile, gender as Gender);
+  const last = await getLastAgeClass(gender);
+  const target = last && allowed.includes(last as import("@/lib/types").AgeClass) ? last : (allowed[0] ?? "all");
+  redirect(`/${clubSlug}/players/${gender}/${target}`);
 }

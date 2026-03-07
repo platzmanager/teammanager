@@ -19,7 +19,6 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   return {
     id: data.id,
     role: data.role,
-    team_id: data.team_id,
     player_uuid: data.player_uuid,
     teams,
     created_at: data.created_at,

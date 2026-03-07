@@ -10,12 +10,15 @@ export default async function ImportPage() {
   await requireAdmin();
 
   const teams = await withClubContext(async (supabase, clubId) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("teams")
       .select("*")
       .eq("club_id", clubId)
       .order("gender")
       .order("age_class");
+    if (error) {
+      throw new Error(`Fehler beim Laden der Mannschaften: ${error.message}`);
+    }
     return (data ?? []) as Team[];
   });
 

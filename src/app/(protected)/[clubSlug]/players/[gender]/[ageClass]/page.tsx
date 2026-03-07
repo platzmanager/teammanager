@@ -4,7 +4,7 @@ import { PlayerTable } from "@/components/player-table";
 import { getUserProfile, canAccessGender, canAccessTeamScope, getUserAgeClasses, getDefaultPath } from "@/lib/auth";
 import { getFilteredPlayers } from "@/actions/players";
 import { getTeams } from "@/actions/teams";
-import { getCurrentClubId } from "@/lib/club";
+import { getCurrentClubId, getLastAgeClass, setLastAgeClass } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
 const validAgeClasses: AgeClass[] = ["all", "30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"];
@@ -32,8 +32,13 @@ export default async function GenderAgeClassPage({
   // Captain trying to access an age class they don't have
   if (!canAccessTeamScope(profile, gender as Gender, ageClass)) {
     const allowed = getUserAgeClasses(profile, gender as Gender);
-    redirect(`/${clubSlug}/players/${gender}/${allowed[0] ?? "all"}`);
+    const last = await getLastAgeClass(gender);
+    const target = last && allowed.includes(last as AgeClass) ? last : (allowed[0] ?? "all");
+    redirect(`/${clubSlug}/players/${gender}/${target}`);
   }
+
+  // Persist last-viewed age class
+  await setLastAgeClass(gender, ageClass);
 
   const initialData = await getFilteredPlayers({
     gender: gender as Gender,
@@ -62,7 +67,7 @@ export default async function GenderAgeClassPage({
         ageClass={ageClass}
         initialData={initialData}
         isAdmin={isAdmin}
-        allowedAgeClasses={isAdmin ? allowedAgeClasses : undefined}
+        allowedAgeClasses={allowedAgeClasses.length > 1 ? allowedAgeClasses : undefined}
         clubId={clubId ?? undefined}
         clubSlug={clubSlug}
         parentTeam={parentTeam ? { name: parentTeam.name, href: `/${clubSlug}/team/${parentTeam.gender}/${parentTeam.slug}` } : undefined}

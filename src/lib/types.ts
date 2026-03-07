@@ -100,8 +100,6 @@ export interface Match {
 export interface UserProfile {
   id: string;
   role: UserRole;
-  team_id: string | null;
-  team?: Team | null;
   player_uuid?: string | null;
   teams?: Team[];
   created_at: string;
