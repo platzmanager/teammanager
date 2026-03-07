@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MapPin, Calendar } from "lucide-react";
+import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MapPin, Calendar, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Team, Player, Match } from "@/lib/types";
+import { Team, Player, Match, EventOccurrence, EventResponse } from "@/lib/types";
 import { getAge } from "@/lib/players";
 import {
   Table,
@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { TeamDetailSheet } from "@/components/team-detail-sheet";
+import { InviteLink } from "@/components/invite-link";
+import { EventList } from "@/components/event-list";
+import { EventForm } from "@/components/event-form";
 import { removeCaptain, inviteCaptain } from "@/actions/teams";
 
 export interface Captain {
@@ -30,7 +33,10 @@ interface TeamDetailClientProps {
   players: Player[];
   blockedCount: number;
   matches: Match[];
+  eventOccurrences: EventOccurrence[];
+  myResponses: Record<string, EventResponse>;
   isAdmin: boolean;
+  isCaptain: boolean;
   clubSlug: string;
 }
 
@@ -44,8 +50,9 @@ function formatTime(t: string | null) {
   return t.slice(0, 5) + " Uhr";
 }
 
-export function TeamDetailClient({ team, captains: initialCaptains, players, blockedCount, matches, isAdmin, clubSlug }: TeamDetailClientProps) {
+export function TeamDetailClient({ team, captains: initialCaptains, players, blockedCount, matches, eventOccurrences, myResponses, isAdmin, isCaptain, clubSlug }: TeamDetailClientProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [eventFormOpen, setEventFormOpen] = useState(false);
   const [captains, setCaptains] = useState(initialCaptains);
   const [showBlocked, setShowBlocked] = useState(false);
   const [showRemaining, setShowRemaining] = useState(false);
@@ -153,6 +160,14 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
         )}
       </section>
 
+      {/* Invite link */}
+      {(isAdmin || isCaptain) && (
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold">Einladungslink</h3>
+          <InviteLink teamId={team.id} inviteToken={team.invite_token} />
+        </section>
+      )}
+
       {/* Registered players */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -236,11 +251,21 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
         )}
       </section>
 
-      {/* Spieltage */}
+      {/* Termine */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Spieltage ({matches.length})</h3>
-        {matches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Spieltage geplant.</p>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Termine ({eventOccurrences.length || matches.length})</h3>
+          {(isAdmin || isCaptain) && (
+            <Button size="sm" variant="outline" onClick={() => setEventFormOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Neuer Termin
+            </Button>
+          )}
+        </div>
+        {eventOccurrences.length > 0 ? (
+          <EventList occurrences={eventOccurrences} myResponses={myResponses} />
+        ) : matches.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Noch keine Termine geplant.</p>
         ) : (
           <div className="space-y-2">
             {matches.map((match) => (
@@ -279,6 +304,10 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
           onOpenChange={setSheetOpen}
           clubSlug={clubSlug}
         />
+      )}
+
+      {(isAdmin || isCaptain) && (
+        <EventForm open={eventFormOpen} onOpenChange={setEventFormOpen} teamId={team.id} />
       )}
     </div>
   );
