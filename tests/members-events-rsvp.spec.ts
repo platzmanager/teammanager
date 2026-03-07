@@ -253,10 +253,6 @@ test("public join page shows registration form", async ({ browser }) => {
   expect(inviteToken).toBeTruthy();
 
   const response = await page.goto(`/join/${inviteToken}`);
-  // Debug: log what we actually got
-  const body = await page.textContent("body");
-  console.log("Join page status:", response?.status(), "body preview:", body?.substring(0, 200));
-
   await expect(page.getByRole("heading", { name: "Registrieren" })).toBeVisible({ timeout: 10000 });
   await expect(page.getByText("Herren I")).toBeVisible();
   await expect(page.getByLabel("Vorname")).toBeVisible();
@@ -318,7 +314,9 @@ test("admin can create a one-time event", async ({ page }) => {
   await page.getByLabel("Titel").fill("Saisonabschluss");
   await page.getByLabel("Beschreibung").fill("Grillabend zum Saisonende");
   await page.getByLabel("Ort").fill("Vereinsheim");
-  await page.getByLabel("Datum").fill("2026-07-15");
+  // Use a date 90 days from now so the test stays evergreen
+  const futureDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  await page.getByLabel("Datum").fill(futureDate);
   await page.getByLabel("Von").fill("18:00");
   await page.getByLabel("Bis").fill("22:00");
 
@@ -341,7 +339,9 @@ test("captain can create a recurring training event", async ({ page }) => {
 
   await page.getByLabel("Titel").fill("Mannschaftstraining");
   await page.getByLabel("Ort").fill("Platz 1-3");
-  await page.getByLabel("Datum").fill("2026-04-01");
+  // Use dynamic dates so the test stays evergreen
+  const trainingStart = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  await page.getByLabel("Datum").fill(trainingStart);
   await page.getByLabel("Von").fill("17:00");
   await page.getByLabel("Bis").fill("19:00");
 
@@ -354,7 +354,8 @@ test("captain can create a recurring training event", async ({ page }) => {
   await page.getByRole("option", { name: "Wöchentlich" }).click();
 
   // Set end date
-  await page.getByLabel("Wiederholung bis").fill("2026-05-31");
+  const trainingEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  await page.getByLabel("Wiederholung bis").fill(trainingEnd);
 
   await page.getByRole("button", { name: "Termin erstellen" }).click();
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 10000 });

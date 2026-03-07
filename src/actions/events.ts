@@ -17,6 +17,17 @@ export async function createEvent(formData: FormData) {
       }
     }
 
+    // Verify team belongs to this club
+    if (teamId) {
+      const { data: team } = await supabase
+        .from("teams")
+        .select("id")
+        .eq("id", teamId)
+        .eq("club_id", clubId)
+        .single();
+      if (!team) throw new Error("Ungültiges Team");
+    }
+
     const eventType = formData.get("event_type") as string;
     const recurrenceType = (formData.get("recurrence_type") as string) || "none";
     const startDate = formData.get("start_date") as string;
@@ -282,8 +293,12 @@ async function generateOccurrences(
   }
 }
 
-export async function createMatchOccurrences(teamId: string, matches: Match[]) {
-  return withClubContext(async (supabase, clubId) => {
+export async function createMatchOccurrences(
+  teamId: string,
+  matches: Match[],
+  existingClient?: { supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>; clubId: string },
+) {
+  const fn = async (supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>, clubId: string) => {
     if (matches.length === 0) return;
 
     // Find or create the "Spieltage" event for this team
@@ -352,7 +367,12 @@ export async function createMatchOccurrences(teamId: string, matches: Match[]) {
           .eq("id", existingId);
       }
     }
-  });
+  };
+
+  if (existingClient) {
+    return fn(existingClient.supabase, existingClient.clubId);
+  }
+  return withClubContext(fn);
 }
 
 export async function getAllTeamEvents(teamId: string) {

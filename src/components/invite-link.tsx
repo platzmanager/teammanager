@@ -48,9 +48,13 @@ export function InviteLink({ teamId, inviteToken: initial }: InviteLinkProps) {
 
   async function handleCopy() {
     if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Kopieren fehlgeschlagen. Bitte den Link manuell markieren und kopieren.");
+    }
   }
 
   return (

@@ -476,7 +476,7 @@ export async function importSchedule(
         .eq("club_id", clubId)
         .order("match_date");
       if (teamMatches && teamMatches.length > 0) {
-        await createMatchOccurrences(teamId, teamMatches as Match[]);
+        await createMatchOccurrences(teamId, teamMatches as Match[], { supabase, clubId });
       }
     }
 

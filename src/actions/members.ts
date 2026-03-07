@@ -246,17 +246,21 @@ export async function registerViaInvite(
 
   const userId = authData.user.id;
 
+  const rollbackAuthUser = async () => {
+    try { await admin.auth.admin.deleteUser(userId); } catch { /* ignore */ }
+  };
+
   // Create user profile
   const { error: profileError } = await admin
     .from("user_profiles")
     .insert({ id: userId, role: "player" });
-  if (profileError) throw new Error("Profil konnte nicht erstellt werden");
+  if (profileError) { await rollbackAuthUser(); throw new Error("Profil konnte nicht erstellt werden"); }
 
   // Create club membership
   const { error: clubError } = await admin
     .from("user_clubs")
     .upsert({ user_id: userId, club_id: team.club_id }, { onConflict: "user_id,club_id" });
-  if (clubError) throw new Error("Vereins-Zuordnung fehlgeschlagen");
+  if (clubError) { await rollbackAuthUser(); throw new Error("Vereins-Zuordnung fehlgeschlagen"); }
 
   // Normalize birth_date
   let birthDate = formData.birth_date;
@@ -290,13 +294,13 @@ export async function registerViaInvite(
     })
     .select("id")
     .single();
-  if (memberError) throw new Error("Mitglied konnte nicht erstellt werden");
+  if (memberError) { await rollbackAuthUser(); throw new Error("Mitglied konnte nicht erstellt werden"); }
 
   // Create team assignment
   const { error: assignError } = await admin
     .from("member_team_assignments")
     .insert({ member_id: member.id, team_id: team.id });
-  if (assignError) throw new Error("Team-Zuordnung fehlgeschlagen");
+  if (assignError) { await rollbackAuthUser(); throw new Error("Team-Zuordnung fehlgeschlagen"); }
 
   // Log
   await admin.from("event_log").insert({
