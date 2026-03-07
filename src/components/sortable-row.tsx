@@ -109,7 +109,7 @@ export function SortableRow({
           {player.last_name}, {player.first_name}
         </div>
         {player.notes && (
-          <div className="text-xs text-muted-foreground mt-0.5">
+          <div className="text-xs text-muted-foreground mt-0.5 max-w-48 truncate" title={player.notes}>
             {player.notes}
           </div>
         )}
