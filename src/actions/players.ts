@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { Gender, AgeClass, AGE_CLASS_CONFIG } from "@/lib/types";
 import { requireRole, requireAdmin, canAccessGender } from "@/lib/auth";
-import { withClubContext } from "@/lib/club";
+import { withClubContext, setLastAgeClass } from "@/lib/club";
+
+export async function saveLastAgeClass(gender: string, ageClass: string) {
+  await setLastAgeClass(gender, ageClass);
+}
 
 export async function getPlayers(gender: Gender) {
   return withClubContext(async (supabase, clubId) => {

@@ -32,6 +32,7 @@ import {
 	type PaginatedPlayers,
 	rebalancePositions,
 	reorderPlayer,
+	saveLastAgeClass,
 	toggleRegistration,
 } from "@/actions/players";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -248,6 +249,11 @@ export function PlayerTable({
 			if (!cancelled) setRegisteredUuids(new Set(uuids));
 		});
 		return () => { cancelled = true; };
+	}, [gender, ageClass]);
+
+	// Persist last-viewed age class for captain multi-team navigation
+	useEffect(() => {
+		saveLastAgeClass(gender, ageClass);
 	}, [gender, ageClass]);
 
 	// Realtime subscriptions

@@ -28,6 +28,8 @@ export async function getLastAgeClass(gender: string): Promise<string | null> {
   return cookieStore.get(`last_age_class_${gender}`)?.value ?? null;
 }
 
+// Note: cookies can only be set in Server Actions or Route Handlers, not during render.
+// Use the setLastAgeClassAction() server action from client components instead.
 export async function setLastAgeClass(gender: string, ageClass: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(`last_age_class_${gender}`, ageClass, { maxAge: 60 * 60 * 24 * 365 });

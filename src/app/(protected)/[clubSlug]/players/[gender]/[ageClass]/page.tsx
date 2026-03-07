@@ -4,7 +4,7 @@ import { PlayerTable } from "@/components/player-table";
 import { getUserProfile, canAccessGender, canAccessTeamScope, getUserAgeClasses, getDefaultPath } from "@/lib/auth";
 import { getFilteredPlayers } from "@/actions/players";
 import { getTeams } from "@/actions/teams";
-import { getCurrentClubId, getLastAgeClass, setLastAgeClass } from "@/lib/club";
+import { getCurrentClubId, getLastAgeClass } from "@/lib/club";
 
 const validGenders: Gender[] = ["female", "male"];
 const validAgeClasses: AgeClass[] = ["all", "30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"];
@@ -36,9 +36,6 @@ export default async function GenderAgeClassPage({
     const target = last && allowed.includes(last as AgeClass) ? last : (allowed[0] ?? "all");
     redirect(`/${clubSlug}/players/${gender}/${target}`);
   }
-
-  // Persist last-viewed age class
-  await setLastAgeClass(gender, ageClass);
 
   const initialData = await getFilteredPlayers({
     gender: gender as Gender,

@@ -44,7 +44,6 @@ export function canAccessGender(profile: UserProfile, gender: Gender): boolean {
 
 export function canAccessTeamScope(profile: UserProfile, gender: Gender, ageClass: AgeClass): boolean {
   if (profile.role === "admin") return true;
-  if (ageClass === "all") return false;
   return profile.teams?.some((t) => t.gender === gender && t.age_class === ageClass) ?? false;
 }
 
@@ -54,7 +53,7 @@ export function getUserAgeClasses(profile: UserProfile, gender: Gender): AgeClas
   profile.teams?.forEach((t) => {
     if (t.gender === gender) ageClasses.add(t.age_class);
   });
-  return (["30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"] as AgeClass[]).filter((ac) => ageClasses.has(ac));
+  return (["all", "30", "40", "50", "60", "u9", "u10", "u12", "u15", "u18"] as AgeClass[]).filter((ac) => ageClasses.has(ac));
 }
 
 export function getDefaultPath(profile: UserProfile, clubSlug: string): string {

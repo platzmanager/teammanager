@@ -19,10 +19,6 @@ export default async function GenderPage({
     redirect(getDefaultPath(profile, clubSlug));
   }
 
-  if (profile.role === "admin") {
-    redirect(`/${clubSlug}/players/${gender}/all`);
-  }
-
   const allowed = getUserAgeClasses(profile, gender as Gender);
   const last = await getLastAgeClass(gender);
   const target = last && allowed.includes(last as import("@/lib/types").AgeClass) ? last : (allowed[0] ?? "all");
