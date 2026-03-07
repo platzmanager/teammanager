@@ -98,7 +98,7 @@ test("selecting a club sets context and redirects", async ({ page }) => {
 
   // Select club Alpha
   await page.getByRole("button", { name: "Testverein Alpha" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 10000 });
 
   // Header should show club name
   await expect(page.getByText("Testverein Alpha")).toBeVisible();
@@ -112,10 +112,10 @@ test("data isolation: club A player visible, club B player hidden", async ({ pag
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/\/club-select/, { timeout: 15000 });
   await page.getByRole("button", { name: "Testverein Alpha" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 10000 });
 
   // Go to female players
-  await page.goto("/female/all");
+  await page.goto("/tv-alpha/players/female/all");
   await page.waitForLoadState("networkidle");
 
   // Club A player should be visible
@@ -133,7 +133,7 @@ test("club switching via user menu", async ({ page }) => {
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/\/club-select/, { timeout: 15000 });
   await page.getByRole("button", { name: "Testverein Alpha" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 10000 });
 
   // Open user menu and click "Club wechseln"
   await page.locator("button").filter({ hasText: /^[A-Z]{1,2}$/ }).click();
@@ -142,14 +142,16 @@ test("club switching via user menu", async ({ page }) => {
 
   // Select club B
   await page.getByRole("button", { name: "Testverein Beta" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/tv-beta\/teams/, { timeout: 10000 });
 
   // Header should show club B
-  await expect(page.getByText("Testverein Beta")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Testverein Beta" })).toBeVisible({ timeout: 10000 });
 
   // Navigate to female players - should see club B player, not club A
-  await page.goto("/female/all");
-  await page.waitForLoadState("networkidle");
+  // Wait for club switch to fully take effect before navigating
+  await expect(page.getByRole("heading", { level: 1, name: "Testverein Beta" })).toBeVisible({ timeout: 10000 });
+  await page.goto("/tv-beta/players/female/all");
+  await expect(page.getByRole("heading", { level: 1, name: "Testverein Beta" })).toBeVisible({ timeout: 10000 });
   await expect(page.getByText("Beta, Ben")).toBeVisible({ timeout: 10000 });
   await expect(page.getByText("Alpha, Anna")).not.toBeVisible();
 });
@@ -162,10 +164,10 @@ test("teams are scoped per club", async ({ page }) => {
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/\/club-select/, { timeout: 15000 });
   await page.getByRole("button", { name: "Testverein Alpha" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 10000 });
 
   // Go to admin teams page
-  await page.goto("/admin/teams");
+  await page.goto("/tv-alpha/teams");
 
   // Should see the team for club A
   await expect(page.getByRole("cell", { name: "Herren 30 I" })).toBeVisible({
@@ -188,7 +190,7 @@ test("single-club user auto-resolves without club-select", async ({ page }) => {
     await page.click('button[type="submit"]');
 
     // Single club user should NOT see club-select, should go directly to app
-    await expect(page).toHaveURL(/\/(female|male)/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 15000 });
 
     // Header should show the club name
     await expect(page.getByText("Testverein Alpha")).toBeVisible();
@@ -217,9 +219,9 @@ test("same player name in two clubs both succeed (CSV import isolation)", async 
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/\/club-select/, { timeout: 15000 });
   await page.getByRole("button", { name: "Testverein Beta" }).click();
-  await expect(page).toHaveURL(/\/(female|male)/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/[^/]+\/teams/, { timeout: 10000 });
 
-  await page.goto("/female/all");
+  await page.goto("/tv-beta/players/female/all");
 
   // Should see the duplicate player in club B
   await expect(page.getByText("Alpha, Anna")).toBeVisible({ timeout: 5000 });

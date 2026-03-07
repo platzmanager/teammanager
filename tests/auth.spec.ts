@@ -28,5 +28,5 @@ test.afterAll(async () => {
 
 test("sign in and reach protected page", async ({ page }) => {
   await login(page);
-  await expect(page.locator("text=Meldeliste")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Teams" })).toBeVisible();
 });
