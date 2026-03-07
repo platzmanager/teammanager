@@ -46,7 +46,7 @@ export async function createEvent(formData: FormData) {
     if (error) throw error;
 
     // Generate occurrences
-    await generateOccurrences(event.id, startDate, startTime, endTime, recurrenceType, recurrenceEndDate);
+    await generateOccurrences(supabase, event.id, startDate, startTime, endTime, recurrenceType, recurrenceEndDate);
 
     revalidatePath("/", "layout");
     return event as ClubEvent;
@@ -148,7 +148,7 @@ export async function getMemberEvents(memberTeamIds: string[]) {
   return withClubContext(async (supabase, clubId) => {
     const today = new Date().toISOString().split("T")[0];
 
-    // Get club-wide events (team_id is null)
+    // Club-wide events (team_id is null)
     const { data: clubEvents, error: clubError } = await supabase
       .from("event_occurrences")
       .select("*, event:events!inner(*), match:matches(*)")
@@ -160,7 +160,7 @@ export async function getMemberEvents(memberTeamIds: string[]) {
 
     if (clubError) throw clubError;
 
-    // Get team events for the member's teams
+    // Team events for the member's teams
     let teamEvents: EventOccurrence[] = [];
     if (memberTeamIds.length > 0) {
       const { data, error } = await supabase
@@ -176,7 +176,6 @@ export async function getMemberEvents(memberTeamIds: string[]) {
       teamEvents = (data ?? []) as EventOccurrence[];
     }
 
-    // Merge and sort
     const all = [...(clubEvents ?? []) as EventOccurrence[], ...teamEvents];
     all.sort((a, b) => {
       const dateComp = a.start_date.localeCompare(b.start_date);
@@ -247,6 +246,7 @@ export async function uncancelOccurrence(id: string) {
 }
 
 async function generateOccurrences(
+  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
   eventId: string,
   startDate: string,
   startTime: string | null,
@@ -254,34 +254,32 @@ async function generateOccurrences(
   recurrenceType: string,
   recurrenceEndDate: string | null,
 ) {
-  return withClubContext(async (supabase) => {
-    const occurrences: { event_id: string; start_date: string; start_time: string | null; end_time: string | null }[] = [];
+  const occurrences: { event_id: string; start_date: string; start_time: string | null; end_time: string | null }[] = [];
 
-    const maxDate = recurrenceEndDate
-      ? new Date(recurrenceEndDate + "T00:00:00")
-      : new Date(new Date(startDate + "T00:00:00").getTime() + 6 * 30 * 24 * 60 * 60 * 1000); // ~6 months
+  const maxDate = recurrenceEndDate
+    ? new Date(recurrenceEndDate + "T00:00:00")
+    : new Date(new Date(startDate + "T00:00:00").getTime() + 6 * 30 * 24 * 60 * 60 * 1000); // ~6 months
 
-    const current = new Date(startDate + "T00:00:00");
+  const current = new Date(startDate + "T00:00:00");
 
-    while (current <= maxDate) {
-      occurrences.push({
-        event_id: eventId,
-        start_date: current.toISOString().split("T")[0],
-        start_time: startTime,
-        end_time: endTime,
-      });
+  while (current <= maxDate) {
+    occurrences.push({
+      event_id: eventId,
+      start_date: current.toISOString().split("T")[0],
+      start_time: startTime,
+      end_time: endTime,
+    });
 
-      if (recurrenceType === "none") break;
-      if (recurrenceType === "weekly") current.setDate(current.getDate() + 7);
-      else if (recurrenceType === "biweekly") current.setDate(current.getDate() + 14);
-      else if (recurrenceType === "monthly") current.setMonth(current.getMonth() + 1);
-    }
+    if (recurrenceType === "none") break;
+    if (recurrenceType === "weekly") current.setDate(current.getDate() + 7);
+    else if (recurrenceType === "biweekly") current.setDate(current.getDate() + 14);
+    else if (recurrenceType === "monthly") current.setMonth(current.getMonth() + 1);
+  }
 
-    if (occurrences.length > 0) {
-      const { error } = await supabase.from("event_occurrences").insert(occurrences);
-      if (error) throw error;
-    }
-  });
+  if (occurrences.length > 0) {
+    const { error } = await supabase.from("event_occurrences").insert(occurrences);
+    if (error) throw error;
+  }
 }
 
 export async function createMatchOccurrences(teamId: string, matches: Match[]) {
@@ -314,22 +312,46 @@ export async function createMatchOccurrences(teamId: string, matches: Match[]) {
       event = newEvent;
     }
 
-    // Delete existing match occurrences for this event
-    await supabase
+    // Get existing occurrences for this event
+    const { data: existing } = await supabase
       .from("event_occurrences")
-      .delete()
+      .select("id, match_id")
       .eq("event_id", event!.id);
 
-    // Create one occurrence per match
-    const occurrences = matches.map((m) => ({
-      event_id: event!.id,
-      start_date: m.match_date,
-      start_time: m.match_time,
-      match_id: m.id,
-    }));
+    const existingByMatchId = new Map((existing ?? []).map((e) => [e.match_id, e.id]));
+    const newMatchIds = new Set(matches.map((m) => m.id));
 
-    const { error } = await supabase.from("event_occurrences").insert(occurrences);
-    if (error) throw error;
+    // Delete occurrences for matches that no longer exist
+    const toDelete = (existing ?? []).filter((e) => !newMatchIds.has(e.match_id)).map((e) => e.id);
+    if (toDelete.length > 0) {
+      await supabase.from("event_occurrences").delete().in("id", toDelete);
+    }
+
+    // Insert only new matches (ones without existing occurrences)
+    const toInsert = matches
+      .filter((m) => !existingByMatchId.has(m.id))
+      .map((m) => ({
+        event_id: event!.id,
+        start_date: m.match_date,
+        start_time: m.match_time,
+        match_id: m.id,
+      }));
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from("event_occurrences").insert(toInsert);
+      if (error) throw error;
+    }
+
+    // Update dates/times for existing occurrences
+    for (const m of matches) {
+      const existingId = existingByMatchId.get(m.id);
+      if (existingId) {
+        await supabase
+          .from("event_occurrences")
+          .update({ start_date: m.match_date, start_time: m.match_time })
+          .eq("id", existingId);
+      }
+    }
   });
 }
 

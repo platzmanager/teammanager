@@ -64,15 +64,43 @@ create policy "Club members can read member team assignments"
     exists (select 1 from members m where m.id = member_id and user_is_club_member(m.club_id))
   );
 
-create policy "Admins and captains can manage member team assignments"
-  on member_team_assignments for all to authenticated
+create policy "Admins can manage member team assignments"
+  on member_team_assignments for insert to authenticated
+  with check (
+    exists (
+      select 1 from members m
+      where m.id = member_id and user_is_club_member(m.club_id)
+      and exists (select 1 from user_profiles where id = auth.uid() and role = 'admin')
+    )
+  );
+
+create policy "Admins can delete member team assignments"
+  on member_team_assignments for delete to authenticated
   using (
     exists (
       select 1 from members m
-      where m.id = member_id and user_is_club_member(m.club_id) and (
-        exists (select 1 from user_profiles where id = auth.uid() and role = 'admin')
-        or exists (select 1 from user_team_assignments where user_id = auth.uid() and team_id = member_team_assignments.team_id)
-      )
+      where m.id = member_id and user_is_club_member(m.club_id)
+      and exists (select 1 from user_profiles where id = auth.uid() and role = 'admin')
+    )
+  );
+
+create policy "Captains can insert member team assignments for their teams"
+  on member_team_assignments for insert to authenticated
+  with check (
+    exists (
+      select 1 from members m
+      where m.id = member_id and user_is_club_member(m.club_id)
+      and exists (select 1 from user_team_assignments where user_id = auth.uid() and team_id = member_team_assignments.team_id)
+    )
+  );
+
+create policy "Captains can delete member team assignments for their teams"
+  on member_team_assignments for delete to authenticated
+  using (
+    exists (
+      select 1 from members m
+      where m.id = member_id and user_is_club_member(m.club_id)
+      and exists (select 1 from user_team_assignments where user_id = auth.uid() and team_id = member_team_assignments.team_id)
     )
   );
 
@@ -111,11 +139,20 @@ create policy "Admins can manage all events"
   using (
     user_is_club_member(club_id) and
     exists (select 1 from user_profiles where id = auth.uid() and role = 'admin')
+  )
+  with check (
+    user_is_club_member(club_id) and
+    exists (select 1 from user_profiles where id = auth.uid() and role = 'admin')
   );
 
 create policy "Captains can manage team events"
   on events for all to authenticated
   using (
+    team_id is not null and
+    user_is_club_member(club_id) and
+    exists (select 1 from user_team_assignments where user_id = auth.uid() and team_id = events.team_id)
+  )
+  with check (
     team_id is not null and
     user_is_club_member(club_id) and
     exists (select 1 from user_team_assignments where user_id = auth.uid() and team_id = events.team_id)
@@ -194,8 +231,23 @@ create policy "Club members can read event responses"
     )
   );
 
-create policy "Members can manage own responses"
-  on event_responses for all to authenticated
+create policy "Members can insert own responses"
+  on event_responses for insert to authenticated
+  with check (
+    exists (select 1 from members m where m.id = member_id and m.user_id = auth.uid())
+  );
+
+create policy "Members can update own responses"
+  on event_responses for update to authenticated
+  using (
+    exists (select 1 from members m where m.id = member_id and m.user_id = auth.uid())
+  )
+  with check (
+    exists (select 1 from members m where m.id = member_id and m.user_id = auth.uid())
+  );
+
+create policy "Members can delete own responses"
+  on event_responses for delete to authenticated
   using (
     exists (select 1 from members m where m.id = member_id and m.user_id = auth.uid())
   );
@@ -214,7 +266,16 @@ alter table event_log add constraint event_log_event_type_check
 -- ─── Backfill: create member records for existing captains ───
 
 insert into members (club_id, user_id, first_name, last_name, email)
-select distinct uc.club_id, up.id, split_part(coalesce(u.raw_user_meta_data->>'full_name', u.email), ' ', 1), coalesce(nullif(split_part(coalesce(u.raw_user_meta_data->>'full_name', ''), ' ', 2), ''), split_part(u.email, '@', 1)), u.email
+select distinct uc.club_id, up.id,
+  split_part(coalesce(u.raw_user_meta_data->>'full_name', u.email), ' ', 1),
+  coalesce(
+    nullif(
+      substring(coalesce(u.raw_user_meta_data->>'full_name', '') from position(' ' in coalesce(u.raw_user_meta_data->>'full_name', '')) + 1),
+      ''
+    ),
+    split_part(u.email, '@', 1)
+  ),
+  u.email
 from user_profiles up
 join auth.users u on u.id = up.id
 join user_clubs uc on uc.user_id = up.id

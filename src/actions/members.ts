@@ -156,36 +156,43 @@ export async function getUnmatchedMembers() {
 
 export async function generateInviteToken(teamId: string) {
   const profile = await requireRole();
-  const isAdmin = profile.role === "admin";
-  const isCaptain = profile.teams?.some((t) => t.id === teamId) ?? false;
-  if (!isAdmin && !isCaptain) throw new Error("Keine Berechtigung");
+  return withClubContext(async (supabase, clubId) => {
+    const isAdmin = profile.role === "admin";
+    const isCaptain = profile.teams?.some((t) => t.id === teamId) ?? false;
+    if (!isAdmin && !isCaptain) throw new Error("Keine Berechtigung");
 
-  const admin = createAdminClient();
-  const token = crypto.randomUUID();
-  const { error } = await admin
-    .from("teams")
-    .update({ invite_token: token })
-    .eq("id", teamId);
-  if (error) throw error;
+    const admin = createAdminClient();
+    const token = crypto.randomUUID();
+    const { error, count } = await admin
+      .from("teams")
+      .update({ invite_token: token })
+      .eq("id", teamId)
+      .eq("club_id", clubId);
+    if (error) throw error;
+    if (count === 0) throw new Error("Team nicht gefunden");
 
-  revalidatePath("/", "layout");
-  return token;
+    revalidatePath("/", "layout");
+    return token;
+  });
 }
 
 export async function revokeInviteToken(teamId: string) {
   const profile = await requireRole();
-  const isAdmin = profile.role === "admin";
-  const isCaptain = profile.teams?.some((t) => t.id === teamId) ?? false;
-  if (!isAdmin && !isCaptain) throw new Error("Keine Berechtigung");
+  return withClubContext(async (supabase, clubId) => {
+    const isAdmin = profile.role === "admin";
+    const isCaptain = profile.teams?.some((t) => t.id === teamId) ?? false;
+    if (!isAdmin && !isCaptain) throw new Error("Keine Berechtigung");
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("teams")
-    .update({ invite_token: null })
-    .eq("id", teamId);
-  if (error) throw error;
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("teams")
+      .update({ invite_token: null })
+      .eq("id", teamId)
+      .eq("club_id", clubId);
+    if (error) throw error;
 
-  revalidatePath("/", "layout");
+    revalidatePath("/", "layout");
+  });
 }
 
 export async function getTeamByInviteToken(token: string) {
@@ -203,6 +210,17 @@ export async function registerViaInvite(
   token: string,
   formData: { first_name: string; last_name: string; birth_date: string; email: string; password: string }
 ) {
+  // Server-side validation
+  if (!formData.first_name?.trim() || !formData.last_name?.trim()) {
+    throw new Error("Vor- und Nachname sind erforderlich");
+  }
+  if (!formData.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    throw new Error("Ungültige E-Mail-Adresse");
+  }
+  if (!formData.password || formData.password.length < 6) {
+    throw new Error("Passwort muss mindestens 6 Zeichen lang sein");
+  }
+
   const admin = createAdminClient();
 
   // Look up team by token
@@ -299,7 +317,7 @@ export async function searchPlayers(query: string) {
       .select("uuid, first_name, last_name, birth_date")
       .eq("club_id", clubId)
       .is("deleted_at", null)
-      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+      .or(`first_name.ilike.%${query.replace(/[%_\\]/g, "\\$&")}%,last_name.ilike.%${query.replace(/[%_\\]/g, "\\$&")}%`)
       .order("last_name")
       .limit(20);
     if (error) throw error;
