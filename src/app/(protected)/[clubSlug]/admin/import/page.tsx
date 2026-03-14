@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlayerImport } from "@/components/import/player-import";
 import { LkImport } from "@/components/import/lk-import";
 import { ScheduleImport } from "@/components/import/schedule-import";
+import { PdfCheck } from "@/components/import/pdf-check";
 
 export default async function ImportPage() {
   await requireAdmin();
@@ -30,6 +31,7 @@ export default async function ImportPage() {
           <TabsTrigger value="players">Spieler</TabsTrigger>
           <TabsTrigger value="lk">LK</TabsTrigger>
           <TabsTrigger value="schedule">Spielplan</TabsTrigger>
+          <TabsTrigger value="meldung">Lizenzcheck</TabsTrigger>
         </TabsList>
         <TabsContent value="players" className="mt-4">
           <PlayerImport />
@@ -39,6 +41,9 @@ export default async function ImportPage() {
         </TabsContent>
         <TabsContent value="schedule" className="mt-4">
           <ScheduleImport teams={teams} />
+        </TabsContent>
+        <TabsContent value="meldung" className="mt-4">
+          <PdfCheck />
         </TabsContent>
       </Tabs>
     </div>
