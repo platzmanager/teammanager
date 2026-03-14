@@ -241,6 +241,53 @@ export async function getRegisteredPlayers(gender: Gender, ageClass: AgeClass) {
   });
 }
 
+export interface RegisteredPlayerWithAgeClasses {
+  uuid: string;
+  first_name: string;
+  last_name: string;
+  birth_date: string;
+  gender: Gender;
+  age_classes: AgeClass[];
+}
+
+/** Returns all registered players (deduplicated) with their registered age classes */
+export async function getAllRegisteredPlayers(): Promise<RegisteredPlayerWithAgeClasses[]> {
+  await requireAdmin();
+
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("player_registrations")
+      .select("gender, age_class, players!inner(uuid, first_name, last_name, birth_date, gender)")
+      .eq("players.club_id", clubId)
+      .is("players.deleted_at", null);
+
+    if (error) throw error;
+
+    const playerMap = new Map<string, RegisteredPlayerWithAgeClasses>();
+    for (const row of data ?? []) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = (row as any).players;
+      const existing = playerMap.get(p.uuid);
+      if (existing) {
+        if (!existing.age_classes.includes(row.age_class as AgeClass)) {
+          existing.age_classes.push(row.age_class as AgeClass);
+        }
+      } else {
+        playerMap.set(p.uuid, {
+          uuid: p.uuid,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          birth_date: p.birth_date,
+          gender: p.gender,
+          age_classes: [row.age_class as AgeClass],
+        });
+      }
+    }
+
+    return Array.from(playerMap.values());
+  });
+}
+
 /** Returns a map of `gender:age_class` → total registered player count */
 export async function getRegistrationCounts(): Promise<Record<string, number>> {
   return withClubContext(async (supabase, clubId) => {
@@ -255,6 +302,25 @@ export async function getRegistrationCounts(): Promise<Record<string, number>> {
     for (const row of data ?? []) {
       const key = `${row.gender}:${row.age_class}`;
       counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  });
+}
+
+/** Returns a map of `team_id` → count of upcoming (pending) matches */
+export async function getPendingMatchCounts(): Promise<Record<string, number>> {
+  return withClubContext(async (supabase, clubId) => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("matches")
+      .select("team_id")
+      .eq("club_id", clubId)
+      .gte("match_date", today);
+    if (error) throw error;
+
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counts[row.team_id] = (counts[row.team_id] ?? 0) + 1;
     }
     return counts;
   });

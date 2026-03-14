@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import { createClient } from "@/lib/supabase/server";
-import { getUserProfile } from "@/lib/auth";
+import { getUserProfile, getUserGenders } from "@/lib/auth";
 import { getUserClubs } from "@/actions/club";
 import { getCurrentClubId } from "@/lib/club";
 import Link from "next/link";
@@ -22,6 +22,7 @@ export default async function ProtectedLayout({
 
 	const profile = await getUserProfile();
 	const isAdmin = profile?.role === "admin";
+	const genders = profile ? getUserGenders(profile) : [];
 
 	const clubs = await getUserClubs();
 	const currentClubId = await getCurrentClubId();
@@ -30,7 +31,6 @@ export default async function ProtectedLayout({
 		redirect("/api/club/resolve");
 	}
 	const clubSlug = currentClub.slug;
-
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -45,26 +45,34 @@ export default async function ProtectedLayout({
 							>
 								Teams
 							</Link>
+							{genders.length > 0 && (
+								<Link
+									href={`/${clubSlug}/players/${genders[0]}/overview`}
+									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+								>
+									Meldeliste
+								</Link>
+							)}
 							<Link
 								href={`/${clubSlug}/events`}
 								className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
 							>
 								Termine
 							</Link>
-								{isAdmin && (
+							{isAdmin && (
 								<>
-								<Link
-									href={`/${clubSlug}/admin/members`}
-									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-								>
-									Mitglieder
-								</Link>
-								<Link
-									href={`/${clubSlug}/admin/import`}
-									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-								>
-									Import
-								</Link>
+									<Link
+										href={`/${clubSlug}/admin/members`}
+										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+									>
+										Mitglieder
+									</Link>
+									<Link
+										href={`/${clubSlug}/admin/import`}
+										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+									>
+										Import
+									</Link>
 								</>
 							)}
 						</nav>

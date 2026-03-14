@@ -384,14 +384,27 @@ export async function importSchedule(
 
     for (const row of rows) {
       const key = `${row.gender}|${row.age_class}`;
-      const teamId = resolvedMapping[key];
+      let teamId = resolvedMapping[key];
+      let ownName = ownTeamNames[key];
+
+      // Multi-team support: try compound keys (gender|age_class|csvTeamName)
+      if (!teamId) {
+        const homeKey = `${key}|${row.home_team}`;
+        const awayKey = `${key}|${row.away_team}`;
+        if (resolvedMapping[homeKey]) {
+          teamId = resolvedMapping[homeKey];
+          ownName = row.home_team;
+        } else if (resolvedMapping[awayKey]) {
+          teamId = resolvedMapping[awayKey];
+          ownName = row.away_team;
+        }
+      }
 
       if (!teamId) {
         skipped.push({ reason: `Keine Mannschaft für ${row.gender === "female" ? "Damen" : "Herren"} ${row.age_class}: ${row.home_team} vs ${row.away_team}` });
         continue;
       }
 
-      const ownName = ownTeamNames[key];
       const isHome = ownName ? row.home_team === ownName : false;
 
       matchInserts.push({

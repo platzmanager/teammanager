@@ -74,10 +74,12 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
   const [teamMapping, setTeamMapping] = useState<Record<string, string>>({});
   // Own team name mapping: key = "gender|age_class", value = CSV team name
   const [ownTeamNames, setOwnTeamNames] = useState<Record<string, string>>({});
+  // Multi-team mapping: groupKey → { teamId → csvTeamName } for groups with multiple candidates
+  const [multiTeamMapping, setMultiTeamMapping] = useState<Record<string, Record<string, string>>>({});
 
   // Compute groups from CSV with match counts
   const groupKeys = [...new Set(rows.map((r) => `${r.gender}|${r.age_class}`))];
-  const groups: { key: string; label: string; matchCount: number; candidates: Team[]; csvTeamNames: string[] }[] = [];
+  const groups: { key: string; label: string; matchCount: number; candidates: Team[]; csvTeamNames: string[]; detectedOwnNames: string[] }[] = [];
 
   for (const key of groupKeys) {
     const [gender, ageClass] = key.split("|");
@@ -93,10 +95,36 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
       if (r.away_team) nameSet.add(r.away_team);
     }
     const csvTeamNames = [...nameSet].sort();
-    groups.push({ key, label, matchCount, candidates, csvTeamNames });
+
+    // Detect own team names for multi-team groups by splitting on league_group
+    const detectedOwnNames: string[] = [];
+    if (candidates.length > 1) {
+      const subGroups = new Map<string, ParsedMatch[]>();
+      for (const r of groupRows) {
+        const sg = r.league_group || "__default__";
+        const existing = subGroups.get(sg) ?? [];
+        existing.push(r);
+        subGroups.set(sg, existing);
+      }
+      for (const [, subMatches] of subGroups) {
+        const subNames = new Set<string>();
+        for (const m of subMatches) {
+          if (m.home_team) subNames.add(m.home_team);
+          if (m.away_team) subNames.add(m.away_team);
+        }
+        const ownName = [...subNames].find((name) =>
+          subMatches.every((m) => m.home_team === name || m.away_team === name)
+        );
+        if (ownName && !detectedOwnNames.includes(ownName)) {
+          detectedOwnNames.push(ownName);
+        }
+      }
+    }
+
+    groups.push({ key, label, matchCount, candidates, csvTeamNames, detectedOwnNames });
   }
 
-  // Auto-select if only one candidate
+  // Auto-select if only one candidate (single-team groups only)
   const effectiveMapping: Record<string, string> = {};
   for (const g of groups) {
     if (teamMapping[g.key]) {
@@ -106,9 +134,10 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
     }
   }
 
-  // Auto-detect own team name: the name appearing in every row of the group
+  // Auto-detect own team name: the name appearing in every row of the group (single-team groups)
   const effectiveOwnNames: Record<string, string> = {};
   for (const g of groups) {
+    if (g.candidates.length > 1) continue;
     if (ownTeamNames[g.key]) {
       effectiveOwnNames[g.key] = ownTeamNames[g.key];
     } else {
@@ -120,7 +149,38 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
     }
   }
 
+  // Multi-team mapping: auto-assign based on Roman numeral suffix → rank
+  const effectiveMultiMapping: Record<string, Record<string, string>> = {};
+  for (const g of groups) {
+    if (g.candidates.length <= 1) continue;
+    if (multiTeamMapping[g.key] && Object.keys(multiTeamMapping[g.key]).length > 0) {
+      effectiveMultiMapping[g.key] = multiTeamMapping[g.key];
+    } else if (g.detectedOwnNames.length === g.candidates.length) {
+      const sortedCandidates = [...g.candidates].sort((a, b) => a.rank - b.rank);
+      const romanRank = (s: string) => {
+        if (/ VI$/i.test(s)) return 6;
+        if (/ V$/i.test(s)) return 5;
+        if (/ IV$/i.test(s)) return 4;
+        if (/ III$/i.test(s)) return 3;
+        if (/ II$/i.test(s)) return 2;
+        return 1;
+      };
+      const sortedNames = [...g.detectedOwnNames].sort((a, b) => romanRank(a) - romanRank(b));
+      const autoMap: Record<string, string> = {};
+      for (let i = 0; i < sortedCandidates.length; i++) {
+        autoMap[sortedCandidates[i].id] = sortedNames[i];
+      }
+      effectiveMultiMapping[g.key] = autoMap;
+    }
+  }
+
   const allMapped = groups.every((g) => {
+    if (g.candidates.length > 1) {
+      if (effectiveMapping[g.key] === "__skip__") return true;
+      const multiMap = effectiveMultiMapping[g.key];
+      if (!multiMap) return false;
+      return g.candidates.every((t) => multiMap[t.id]);
+    }
     const mapping = effectiveMapping[g.key];
     if (!mapping || mapping === "__skip__") return !!mapping;
     return !!effectiveOwnNames[g.key];
@@ -131,6 +191,7 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
     setResult(null);
     setTeamMapping({});
     setOwnTeamNames({});
+    setMultiTeamMapping({});
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -188,6 +249,7 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
     setResult(null);
     setTeamMapping({});
     setOwnTeamNames({});
+    setMultiTeamMapping({});
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -197,13 +259,39 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
     setLoading(true);
     setResult(null);
     try {
-      // Filter out skipped groups
       const fullMapping: Record<string, string> = {};
+      const fullOwnNames: Record<string, string> = {};
+
+      // Single-team groups: simple keys
       for (const [key, val] of Object.entries(effectiveMapping)) {
-        if (val !== "__skip__") fullMapping[key] = val;
+        if (val !== "__skip__") {
+          fullMapping[key] = val;
+          if (effectiveOwnNames[key]) fullOwnNames[key] = effectiveOwnNames[key];
+        }
       }
+
+      // Multi-team groups: compound keys (gender|age_class|csvTeamName)
+      for (const g of groups) {
+        if (g.candidates.length <= 1) continue;
+        if (effectiveMapping[g.key] === "__skip__") continue;
+        const multiMap = effectiveMultiMapping[g.key];
+        if (!multiMap) continue;
+        for (const [teamId, csvName] of Object.entries(multiMap)) {
+          if (csvName && csvName !== "__none__") {
+            const compoundKey = `${g.key}|${csvName}`;
+            fullMapping[compoundKey] = teamId;
+            fullOwnNames[compoundKey] = csvName;
+          }
+        }
+      }
+
       const res = await importSchedule(
-        rows.filter((r) => fullMapping[`${r.gender}|${r.age_class}`]).map((r) => ({
+        rows.filter((r) => {
+          const key = `${r.gender}|${r.age_class}`;
+          return fullMapping[key]
+            || fullMapping[`${key}|${r.home_team}`]
+            || fullMapping[`${key}|${r.away_team}`];
+        }).map((r) => ({
           match_date: r.match_date,
           match_time: r.match_time,
           home_team: r.home_team,
@@ -217,7 +305,7 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
           league_group: r.league_group,
         })),
         fullMapping,
-        effectiveOwnNames
+        fullOwnNames
       );
       setResult(res);
       setRows([]);
@@ -284,6 +372,85 @@ export function ScheduleImport({ teams }: { teams: Team[] }) {
           <div className="grid gap-4">
             {groups.map((g) => {
               const isSkipped = effectiveMapping[g.key] === "__skip__";
+              const isMultiTeam = g.candidates.length > 1;
+
+              if (isMultiTeam) {
+                const multiMap = effectiveMultiMapping[g.key] ?? {};
+                const usedNames = Object.values(multiMap).filter((v) => v && v !== "__none__");
+                const dropdownNames = g.detectedOwnNames.length > 0 ? g.detectedOwnNames : g.csvTeamNames;
+
+                return (
+                  <div key={g.key} className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        {g.label}
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          ({g.matchCount} Spiele, {g.candidates.length} Mannschaften)
+                        </span>
+                      </p>
+                      {isSkipped ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTeamMapping((prev) => {
+                            const next = { ...prev };
+                            delete next[g.key];
+                            return next;
+                          })}
+                        >
+                          Doch importieren
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground"
+                          onClick={() => setTeamMapping((prev) => ({ ...prev, [g.key]: "__skip__" }))}
+                        >
+                          Überspringen
+                        </Button>
+                      )}
+                    </div>
+                    {isSkipped ? (
+                      <p className="text-xs text-muted-foreground">Diese Gruppe wird nicht importiert.</p>
+                    ) : (
+                      <div className="grid gap-2">
+                        {[...g.candidates].sort((a, b) => a.rank - b.rank).map((t) => (
+                          <div key={t.id} className="grid gap-2 sm:grid-cols-2 items-center">
+                            <span className="text-sm">{t.name}</span>
+                            <Select
+                              value={multiMap[t.id] ?? ""}
+                              onValueChange={(v) =>
+                                setMultiTeamMapping((prev) => ({
+                                  ...prev,
+                                  [g.key]: { ...(prev[g.key] ?? {}), [t.id]: v },
+                                }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="CSV-Team wählen…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Nicht zuordnen</SelectItem>
+                                {dropdownNames.map((name) => (
+                                  <SelectItem
+                                    key={name}
+                                    value={name}
+                                    disabled={usedNames.includes(name) && multiMap[t.id] !== name}
+                                  >
+                                    {name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div key={g.key} className="grid gap-2 sm:grid-cols-2 rounded-md border p-3">
                   <div className="space-y-1.5">
