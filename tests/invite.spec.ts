@@ -93,7 +93,7 @@ test("invite flow: email → set password → protected page", async ({
   await page.click('button[type="submit"]');
 
   // 7. Should redirect to protected page
-  await expect(page).toHaveURL(/\/(female|male)|\/club-select/, {
+  await expect(page).toHaveURL(/\/[^/]+\/teams|\/club-select/, {
     timeout: 10000,
   });
 });

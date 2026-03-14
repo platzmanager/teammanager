@@ -32,7 +32,6 @@ export default async function ProtectedLayout({
 	}
 	const clubSlug = currentClub.slug;
 
-
 	return (
 		<div className="min-h-screen bg-gray-50">
 			<header className="border-b bg-white">
@@ -54,13 +53,27 @@ export default async function ProtectedLayout({
 									Meldeliste
 								</Link>
 							)}
+							<Link
+								href={`/${clubSlug}/events`}
+								className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+							>
+								Termine
+							</Link>
 							{isAdmin && (
-								<Link
-									href={`/${clubSlug}/admin/import`}
-									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-								>
-									Import
-								</Link>
+								<>
+									<Link
+										href={`/${clubSlug}/admin/members`}
+										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+									>
+										Mitglieder
+									</Link>
+									<Link
+										href={`/${clubSlug}/admin/import`}
+										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+									>
+										Import
+									</Link>
+								</>
 							)}
 						</nav>
 						<UserMenu

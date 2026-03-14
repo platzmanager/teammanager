@@ -63,7 +63,7 @@ async function addPlayer(page: Page, player: typeof TEST_PLAYERS[number]) {
 test.describe.serial("player management", () => {
   test("create female players", async ({ page }) => {
     await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
-    await page.goto("/female/all");
+    await page.goto("/players-test/players/female/all");
 
     const femalePlayers = TEST_PLAYERS.filter((p) => p.gender === "female");
     for (const player of femalePlayers) {
@@ -78,7 +78,7 @@ test.describe.serial("player management", () => {
 
   test("create male players", async ({ page }) => {
     await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
-    await page.goto("/male/all");
+    await page.goto("/players-test/players/male/all");
 
     const malePlayers = TEST_PLAYERS.filter((p) => p.gender === "male");
     for (const player of malePlayers) {
@@ -92,7 +92,7 @@ test.describe.serial("player management", () => {
 
   test("age class filters work", async ({ page }) => {
     await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
-    await page.goto("/female/all");
+    await page.goto("/players-test/players/female/all");
 
     // Tab "40" should show Carla (42), Dagmar (52), Elfriede (66) but not Anna (26) or Bettina (32)
     await page.getByRole("link", { name: "40" }).click();
@@ -109,9 +109,9 @@ test.describe.serial("player management", () => {
 
   test("registration column is visible", async ({ page }) => {
     await loginAs(page, PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
-    await page.goto("/female/all");
+    await page.goto("/players-test/players/female/all");
 
     // Registration column should be visible
-    await expect(page.getByText("Gemeldet")).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Gemeldet" })).toBeVisible();
   });
 });

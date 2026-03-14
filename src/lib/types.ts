@@ -80,6 +80,7 @@ export interface Team {
   league_class: string | null;
   league: string | null;
   league_group: string | null;
+  invite_token: string | null;
   created_at: string;
 }
 
@@ -103,4 +104,85 @@ export interface UserProfile {
   player_uuid?: string | null;
   teams?: Team[];
   created_at: string;
+}
+
+// ─── Members, Events & RSVP ───
+
+export type EventType = "match" | "training" | "social" | "custom";
+export type RecurrenceType = "none" | "weekly" | "biweekly" | "monthly";
+export type RsvpResponse = "yes" | "no" | "maybe";
+
+export const EVENT_TYPE_LABELS: Record<EventType, string> = {
+  match: "Spieltag",
+  training: "Training",
+  social: "Gesellig",
+  custom: "Sonstiges",
+};
+
+export const RECURRENCE_TYPE_LABELS: Record<RecurrenceType, string> = {
+  none: "Einmalig",
+  weekly: "Wöchentlich",
+  biweekly: "Alle 2 Wochen",
+  monthly: "Monatlich",
+};
+
+export const RSVP_LABELS: Record<RsvpResponse, string> = {
+  yes: "Zusage",
+  no: "Absage",
+  maybe: "Vielleicht",
+};
+
+export interface Member {
+  id: string;
+  club_id: string;
+  user_id: string | null;
+  first_name: string;
+  last_name: string;
+  birth_date: string | null;
+  email: string | null;
+  player_uuid: string | null;
+  created_at: string;
+}
+
+export interface ClubEvent {
+  id: string;
+  club_id: string;
+  team_id: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  event_type: EventType;
+  recurrence_type: RecurrenceType;
+  recurrence_day_of_week: number | null;
+  recurrence_end_date: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EventOccurrence {
+  id: string;
+  event_id: string;
+  start_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  cancelled: boolean;
+  notes: string | null;
+  match_id: string | null;
+  created_at: string;
+  // Joined fields
+  event?: ClubEvent;
+  match?: Match;
+  responses?: EventResponse[];
+}
+
+export interface EventResponse {
+  id: string;
+  event_occurrence_id: string;
+  member_id: string;
+  response: RsvpResponse;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  member?: Member;
 }

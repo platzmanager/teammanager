@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { Gender, AgeClass, UserProfile, Team } from "@/lib/types";
+import { Gender, AgeClass, UserProfile, Team, Member } from "@/lib/types";
+import { getCurrentClubId } from "@/lib/club";
 
 export async function getUserProfile(): Promise<UserProfile | null> {
   const supabase = await createClient();
@@ -70,4 +71,22 @@ export function getUserGenders(profile: UserProfile): Gender[] {
 export function getUserTeamScopes(profile: UserProfile): { gender: Gender; age_class: AgeClass }[] {
   if (profile.role === "admin") return [];
   return (profile.teams ?? []).map((t) => ({ gender: t.gender, age_class: t.age_class }));
+}
+
+export async function getMemberForUser(): Promise<Member | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const clubId = await getCurrentClubId();
+  if (!clubId) return null;
+
+  const { data } = await supabase
+    .from("members")
+    .select("*")
+    .eq("club_id", clubId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return data as Member | null;
 }
