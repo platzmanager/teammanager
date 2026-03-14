@@ -6,13 +6,13 @@ import { AgeClass, Gender, AGE_CLASS_CONFIG } from "@/lib/types";
 
 interface AgeClassTabsProps {
   gender: Gender;
-  current: AgeClass;
+  current: AgeClass | "overview";
   allowed: AgeClass[];
   clubSlug: string;
 }
 
 const ageClassLabels: Record<AgeClass, string> = {
-  all: "Alle",
+  all: "00",
   "30": "30",
   "40": "40",
   "50": "50",
@@ -24,10 +24,19 @@ const ageClassLabels: Record<AgeClass, string> = {
   u18: "U18",
 };
 
-export function AgeClassTabs({ gender, current, allowed, clubSlug }: AgeClassTabsProps) {
+const SENIOR_CLASSES: AgeClass[] = ["all", "30", "40", "50", "60"];
+const YOUTH_CLASSES: AgeClass[] = ["u9", "u10", "u12", "u15", "u18"];
+
+function TabGroup({ items, gender, current, clubSlug }: {
+  items: AgeClass[];
+  gender: Gender;
+  current: AgeClass | "overview";
+  clubSlug: string;
+}) {
+  if (items.length === 0) return null;
   return (
     <div className="inline-flex items-center rounded-lg bg-muted p-1">
-      {allowed.map((ac) => (
+      {items.map((ac) => (
         <Link
           key={ac}
           href={`/${clubSlug}/players/${gender}/${ac}`}
@@ -41,6 +50,18 @@ export function AgeClassTabs({ gender, current, allowed, clubSlug }: AgeClassTab
           {ageClassLabels[ac]}
         </Link>
       ))}
+    </div>
+  );
+}
+
+export function AgeClassTabs({ gender, current, allowed, clubSlug }: AgeClassTabsProps) {
+  const seniorTabs = SENIOR_CLASSES.filter((ac) => allowed.includes(ac));
+  const youthTabs = YOUTH_CLASSES.filter((ac) => allowed.includes(ac));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <TabGroup items={seniorTabs} gender={gender} current={current} clubSlug={clubSlug} />
+      <TabGroup items={youthTabs} gender={gender} current={current} clubSlug={clubSlug} />
     </div>
   );
 }

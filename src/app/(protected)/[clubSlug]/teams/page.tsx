@@ -10,10 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Team, Gender, GENDER_LABELS, AGE_CLASS_CONFIG, UserProfile } from "@/lib/types";
-import { getTeams, getSessionProfile, getRegistrationCounts } from "@/actions/teams";
+import { getTeams, getSessionProfile, getRegistrationCounts, getPendingMatchCounts } from "@/actions/teams";
 import { TeamForm } from "@/components/team-form";
 
 const genderFilters: { value: Gender | "all"; label: string }[] = [
@@ -25,7 +25,8 @@ const genderFilters: { value: Gender | "all"; label: string }[] = [
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [regCounts, setRegCounts] = useState<Record<string, number>>({});
+  const [regCounts, setRegCounts] = useState<Record<string, number> | null>(null);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number> | null>(null);
   const [genderFilter, setGenderFilter] = useState<Gender | "all">("all");
   const router = useRouter();
   const params = useParams<{ clubSlug: string }>();
@@ -34,22 +35,39 @@ export default function TeamsPage() {
   const userTeamIds = new Set(profile?.teams?.map((t) => t.id) ?? []);
 
   const refresh = async () => {
-    const [data, counts] = await Promise.all([getTeams(), getRegistrationCounts()]);
+    const [data, counts, matches] = await Promise.all([
+      getTeams(),
+      getRegistrationCounts(),
+      getPendingMatchCounts(),
+    ]);
     setTeams(data);
     setRegCounts(counts);
+    setMatchCounts(matches);
   };
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getTeams(), getSessionProfile(), getRegistrationCounts()]).then(([data, prof, counts]) => {
+
+    // Phase 1: Load teams + profile (fast)
+    Promise.all([getTeams(), getSessionProfile()]).then(([data, prof]) => {
       if (!cancelled) {
         setTeams(data);
         setProfile(prof);
-        setRegCounts(counts);
       }
     }).catch((err) => {
       console.error("Failed to load teams:", err);
     });
+
+    // Phase 2: Load registration counts + pending match counts (can be slower)
+    Promise.all([getRegistrationCounts(), getPendingMatchCounts()]).then(([counts, matches]) => {
+      if (!cancelled) {
+        setRegCounts(counts);
+        setMatchCounts(matches);
+      }
+    }).catch((err) => {
+      console.error("Failed to load counts:", err);
+    });
+
     return () => { cancelled = true; };
   }, []);
 
@@ -57,6 +75,7 @@ export default function TeamsPage() {
 
   // Total registered players available for this team (registered minus blocked by higher-ranked teams)
   function getTeamAvailableCount(team: Team): number {
+    if (!regCounts) return 0;
     const key = `${team.gender}:${team.age_class}`;
     const totalRegistered = regCounts[key] ?? 0;
     const sameGroup = teams.filter((t) => t.gender === team.gender && t.age_class === team.age_class);
@@ -65,6 +84,8 @@ export default function TeamsPage() {
       .reduce((sum, t) => sum + t.team_size, 0);
     return Math.max(0, totalRegistered - blockedCount);
   }
+
+  const countsLoading = regCounts === null || matchCounts === null;
 
   return (
     <div className="space-y-4">
@@ -98,14 +119,15 @@ export default function TeamsPage() {
               <TableHead>Name</TableHead>
               <TableHead>Geschlecht</TableHead>
               <TableHead>Altersklasse</TableHead>
-              <TableHead className="text-center">Gemeldet</TableHead>
+              <TableHead className="text-center">Personen</TableHead>
+              <TableHead className="text-center">Spiele</TableHead>
               <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   Keine Teams vorhanden
                 </TableCell>
               </TableRow>
@@ -124,7 +146,9 @@ export default function TeamsPage() {
                     <TableCell>{GENDER_LABELS[team.gender]}</TableCell>
                     <TableCell>{AGE_CLASS_CONFIG[team.age_class]?.label ?? team.age_class}</TableCell>
                     <TableCell className="text-center">
-                      {(() => {
+                      {countsLoading ? (
+                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (() => {
                         const available = getTeamAvailableCount(team);
                         return (
                           <span className={cn(available < team.team_size ? "text-amber-600" : "text-green-600")}>
@@ -132,6 +156,13 @@ export default function TeamsPage() {
                           </span>
                         );
                       })()}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {countsLoading ? (
+                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <span>{matchCounts?.[team.id] ?? 0}</span>
+                      )}
                     </TableCell>
                     <TableCell>{canAccess && <ChevronRight className="h-4 w-4 text-muted-foreground" />}</TableCell>
                   </TableRow>

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Gender, AgeClass, AGE_CLASS_CONFIG } from "@/lib/types";
+import { type Gender, type AgeClass, AGE_CLASS_CONFIG, type Player } from "@/lib/types";
 import { requireRole, requireAdmin, canAccessGender } from "@/lib/auth";
 import { withClubContext, setLastAgeClass } from "@/lib/club";
 
@@ -523,5 +523,53 @@ export async function getPlayerDistributions(filters: {
       totalLk,
       totalAge: data.length,
     };
+  });
+}
+
+export interface PlayerOverviewData {
+  players: Player[];
+  registrationMap: Record<string, AgeClass[]>;
+}
+
+export async function getPlayerOverviewData(gender: Gender): Promise<PlayerOverviewData> {
+  const profile = await requireRole();
+  if (!canAccessGender(profile, gender)) {
+    throw new Error("Keine Berechtigung für dieses Geschlecht");
+  }
+
+  return withClubContext(async (supabase, clubId) => {
+    const [{ data: players, error: pErr }, { data: regs, error: rErr }] = await Promise.all([
+      supabase
+        .from("players")
+        .select("*")
+        .eq("gender", gender)
+        .eq("club_id", clubId)
+        .is("deleted_at", null)
+        .order("skill_level", { ascending: true })
+        .order("sort_position", { ascending: true }),
+      supabase
+        .from("player_registrations")
+        .select("player_uuid, age_class, players!inner(club_id)")
+        .eq("gender", gender)
+        .eq("players.club_id", clubId),
+    ]);
+
+    if (pErr) throw pErr;
+    if (rErr) throw rErr;
+
+    const { sortPlayers } = await import("@/lib/players");
+    const sorted = sortPlayers(players ?? []);
+
+    const registrationMap: Record<string, AgeClass[]> = {};
+    for (const r of regs ?? []) {
+      const uuid = r.player_uuid as string;
+      const ac = r.age_class as AgeClass;
+      if (!registrationMap[uuid]) {
+        registrationMap[uuid] = [];
+      }
+      registrationMap[uuid].push(ac);
+    }
+
+    return { players: sorted, registrationMap };
   });
 }
