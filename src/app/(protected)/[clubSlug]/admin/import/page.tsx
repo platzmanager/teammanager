@@ -1,11 +1,12 @@
 import { requireAdmin } from "@/lib/auth";
 import { withClubContext } from "@/lib/club";
-import { Team } from "@/lib/types";
+import type { Team } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlayerImport } from "@/components/import/player-import";
 import { LkImport } from "@/components/import/lk-import";
 import { ScheduleImport } from "@/components/import/schedule-import";
 import { PdfCheck } from "@/components/import/pdf-check";
+import { EntryListCheck } from "@/components/import/entry-list-check";
 
 export default async function ImportPage() {
   await requireAdmin();
@@ -32,6 +33,7 @@ export default async function ImportPage() {
           <TabsTrigger value="lk">LK</TabsTrigger>
           <TabsTrigger value="schedule">Spielplan</TabsTrigger>
           <TabsTrigger value="meldung">Lizenzcheck</TabsTrigger>
+          <TabsTrigger value="meldeliste">Meldelisten-Abgleich</TabsTrigger>
         </TabsList>
         <TabsContent value="players" className="mt-4">
           <PlayerImport />
@@ -44,6 +46,9 @@ export default async function ImportPage() {
         </TabsContent>
         <TabsContent value="meldung" className="mt-4">
           <PdfCheck />
+        </TabsContent>
+        <TabsContent value="meldeliste" className="mt-4">
+          <EntryListCheck />
         </TabsContent>
       </Tabs>
     </div>
