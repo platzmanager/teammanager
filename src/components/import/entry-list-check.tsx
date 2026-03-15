@@ -124,95 +124,93 @@ function groupIntoRows(items: TextItem[]): TextItem[][] {
   return rows;
 }
 
-function findHeaderRow(
-  rows: TextItem[][],
-): { headerIndex: number; columns: Record<string, number> } | null {
-  for (let i = 0; i < rows.length; i++) {
-    const rowText = rows[i].map((item) => item.str).join(" ");
-    if (
-      rowText.includes("Ra.") &&
-      rowText.includes("Name") &&
-      (rowText.includes("ID-Nr") || rowText.includes("ID Nr"))
-    ) {
-      const columns: Record<string, number> = {};
-      for (const item of rows[i]) {
-        if (item.str.includes("Ra")) columns["rank"] = item.x;
-        if (item.str.includes("Name")) columns["name"] = item.x;
-        if (item.str.includes("Nat")) columns["nationality"] = item.x;
-        if (item.str.includes("ID")) columns["licenseId"] = item.x;
-        if (item.str === "LK" || item.str.startsWith("LK")) columns["skillLevel"] = item.x;
-        if (item.str === "DR" || item.str.startsWith("DR")) columns["dr"] = item.x;
-      }
-      return { headerIndex: i, columns };
+function tryParsePlayerRow(row: TextItem[]): PdfPlayer | null {
+  if (row.length < 2) return null;
+
+  const firstStr = row[0].str.trim();
+  let rank = "";
+  let nameStr = "";
+  let restStartIdx = 0;
+
+  // Case 1: First item is just a rank number (e.g., "1", "25")
+  if (/^\d{1,3}$/.test(firstStr)) {
+    rank = firstStr;
+    nameStr = row[1]?.str.trim() ?? "";
+    restStartIdx = 2;
+  }
+  // Case 2: Rank + name combined (e.g., "100 Coy, Remy Carlos")
+  else {
+    const m = firstStr.match(/^(\d{1,3})\s+(.+)/);
+    if (m) {
+      rank = m[1];
+      nameStr = m[2];
+      restStartIdx = 1;
     }
   }
-  return null;
-}
 
-function parseDataRows(
-  rows: TextItem[][],
-  startIndex: number,
-  columns: Record<string, number>,
-): PdfPlayer[] {
-  const players: PdfPlayer[] = [];
-  const colKeys = Object.keys(columns);
-  const colPositions = Object.entries(columns).sort((a, b) => a[1] - b[1]);
+  // Must have rank and a comma-separated name
+  if (!rank || !nameStr.includes(",")) return null;
 
-  for (let i = startIndex; i < rows.length; i++) {
-    const row = rows[i];
-    if (row.length < 3) continue;
+  const [lastName, firstName] = nameStr.split(",", 2).map((s) => s.trim());
+  if (!lastName) return null;
 
-    const assigned: Record<string, string[]> = {};
-    for (const key of colKeys) assigned[key] = [];
+  // Join remaining items and extract nationality, ID-Nr., and LK via regex
+  const restText = row.slice(restStartIdx).map((r) => r.str).join(" ");
+  const natMatch = restText.match(/\b([A-Z]{2,3})\*?\b/);
+  const idMatch = restText.match(/(\d{7,10})/);
+  const lkMatch = restText.match(/LK\s*(\d+[,.]?\d*)/);
 
-    for (const item of row) {
-      let bestCol = colKeys[0];
-      let bestDist = Infinity;
-      for (const [key, pos] of colPositions) {
-        const dist = Math.abs(item.x - pos);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestCol = key;
-        }
-      }
-      assigned[bestCol].push(item.str);
-    }
-
-    const nameStr = assigned["name"]?.join(" ") ?? "";
-    let lastName: string;
-    let firstName: string;
-    if (nameStr.includes(",")) {
-      [lastName, firstName] = nameStr.split(",", 2).map((s) => s.trim());
-    } else {
-      lastName = nameStr;
-      firstName = "";
-    }
-
-    if (!lastName) continue;
-
-    // Skip rows that look like headers or footers
-    const rankStr = assigned["rank"]?.join("") ?? "";
-    if (rankStr && !/^\d+$/.test(rankStr.trim())) continue;
-
-    players.push({
-      rank: rankStr.trim(),
-      lastName,
-      firstName,
-      nationality: assigned["nationality"]?.join("") ?? "",
-      licenseId: assigned["licenseId"]?.join("") ?? "",
-      skillLevel: assigned["skillLevel"]?.join("") ?? "",
-      dr: assigned["dr"]?.join("") ?? "",
-    });
-  }
-
-  return players;
+  return {
+    rank,
+    lastName,
+    firstName,
+    nationality: natMatch?.[1] ?? "",
+    licenseId: idMatch?.[1] ?? "",
+    skillLevel: lkMatch?.[1] ?? "",
+    dr: "",
+  };
 }
 
 function parsePdfPlayers(textItems: TextItem[]): PdfPlayer[] {
-  const rows = groupIntoRows(textItems);
-  const header = findHeaderRow(rows);
-  if (!header) return [];
-  return parseDataRows(rows, header.headerIndex + 1, header.columns);
+  // Find all "Ra. Name" header items to identify table section X positions
+  const headerItems = textItems.filter(
+    (item) => item.str.startsWith("Ra.") && item.str.includes("Name"),
+  );
+  if (headerItems.length === 0) return [];
+
+  // Unique X positions for table sections (e.g., left column and right column)
+  const sectionXs = [...new Set(headerItems.map((h) => h.x))].sort(
+    (a, b) => a - b,
+  );
+
+  // Assign each item to a section based on X proximity
+  function getSectionIndex(x: number): number | null {
+    for (let i = sectionXs.length - 1; i >= 0; i--) {
+      if (x >= sectionXs[i] - 10) return i;
+    }
+    return null; // Not part of any table section
+  }
+
+  // Split items by section
+  const sectionItems: TextItem[][] = sectionXs.map(() => []);
+  for (const item of textItems) {
+    const si = getSectionIndex(item.x);
+    if (si !== null) sectionItems[si].push(item);
+  }
+
+  // Parse each section independently
+  const players: PdfPlayer[] = [];
+  for (const items of sectionItems) {
+    const rows = groupIntoRows(items);
+    for (const row of rows) {
+      const player = tryParsePlayerRow(row);
+      if (player) players.push(player);
+    }
+  }
+
+  // Sort by rank number
+  players.sort((a, b) => (parseInt(a.rank, 10) || 0) - (parseInt(b.rank, 10) || 0));
+  return players;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,6 +256,10 @@ function detectGenderAndAgeClass(fullText: string): DetectedCategory | null {
 // Matching
 // ---------------------------------------------------------------------------
 
+function stripTitle(name: string): string {
+  return name.replace(/^(Dr\.\s*|Prof\.\s*)/i, "");
+}
+
 function pdfPlayerKey(pp: PdfPlayer): string {
   return pp.licenseId || `${pp.lastName}_${pp.firstName}`;
 }
@@ -284,7 +286,7 @@ function findMatchInPdf(
     if (idMatch) {
       // Verify name also matches for extra confidence
       const nameAlsoMatches =
-        normalizeText(idMatch.lastName) === sysLast &&
+        normalizeText(stripTitle(idMatch.lastName)) === sysLast &&
         normalizeText(idMatch.firstName) === sysFirst;
       return {
         pdfPlayer: idMatch,
@@ -295,10 +297,10 @@ function findMatchInPdf(
 
   // Fallback: match by name (only when system player has no license number)
   if (!systemPlayer.license) {
-    // Exact name match
+    // Exact name match (strip titles like "Dr." from PDF names)
     const exactMatch = pdfPlayers.find(
       (pp) =>
-        normalizeText(pp.lastName) === sysLast &&
+        normalizeText(stripTitle(pp.lastName)) === sysLast &&
         normalizeText(pp.firstName) === sysFirst,
     );
     if (exactMatch) return { pdfPlayer: exactMatch, matchType: "name_exact" };
@@ -306,7 +308,7 @@ function findMatchInPdf(
     // Fuzzy: last name exact + first name prefix (min 3 chars)
     if (sysFirst.length >= 3) {
       const fuzzyMatch = pdfPlayers.find((pp) => {
-        const ppLast = normalizeText(pp.lastName);
+        const ppLast = normalizeText(stripTitle(pp.lastName));
         const ppFirst = normalizeText(pp.firstName);
         return (
           ppLast === sysLast &&
@@ -330,8 +332,8 @@ function isClubPlayer(
     if (allClubPlayers.some((cp) => cp.license === pp.licenseId)) return true;
   }
 
-  // Fallback: match by name
-  const ppLast = normalizeText(pp.lastName);
+  // Fallback: match by name (strip titles like "Dr." from PDF names)
+  const ppLast = normalizeText(stripTitle(pp.lastName));
   const ppFirst = normalizeText(pp.firstName);
   return allClubPlayers.some(
     (cp) =>
@@ -617,11 +619,9 @@ export function EntryListCheck() {
                   <SelectValue placeholder="Auswählen…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(AGE_CLASS_CONFIG)
-                    .filter(([key]) => key !== "all")
-                    .map(([key, config]) => (
-                      <SelectItem key={key} value={key}>{config.label}</SelectItem>
-                    ))}
+                  {Object.entries(AGE_CLASS_CONFIG).map(([key, config]) => (
+                    <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
