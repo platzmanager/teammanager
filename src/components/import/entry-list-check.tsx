@@ -20,7 +20,11 @@ import {
   Search,
 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
-import { getRegisteredPlayers, getAllClubPlayers } from "@/actions/teams";
+import {
+  getRegisteredPlayers,
+  getAllRegisteredPlayers,
+  type RegisteredPlayerWithAgeClasses,
+} from "@/actions/teams";
 import type { Player, Gender, AgeClass } from "@/lib/types";
 import { GENDER_LABELS, AGE_CLASS_CONFIG } from "@/lib/types";
 
@@ -323,23 +327,24 @@ function findMatchInPdf(
   return null;
 }
 
-function isClubPlayer(
+function findRegisteredPlayer(
   pp: PdfPlayer,
-  allClubPlayers: Pick<Player, "uuid" | "first_name" | "last_name" | "license" | "birth_date" | "gender">[],
-): boolean {
+  registeredPlayers: RegisteredPlayerWithAgeClasses[],
+): RegisteredPlayerWithAgeClasses | null {
   // Primary: match by license/ID-Nr.
   if (pp.licenseId) {
-    if (allClubPlayers.some((cp) => cp.license === pp.licenseId)) return true;
+    const match = registeredPlayers.find((rp) => rp.license === pp.licenseId);
+    if (match) return match;
   }
 
   // Fallback: match by name (strip titles like "Dr." from PDF names)
   const ppLast = normalizeText(stripTitle(pp.lastName));
   const ppFirst = normalizeText(pp.firstName);
-  return allClubPlayers.some(
-    (cp) =>
-      normalizeText(cp.last_name) === ppLast &&
-      normalizeText(cp.first_name) === ppFirst,
-  );
+  return registeredPlayers.find(
+    (rp) =>
+      normalizeText(rp.last_name) === ppLast &&
+      normalizeText(rp.first_name) === ppFirst,
+  ) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,10 +466,15 @@ export function EntryListCheck() {
     setProgress({ done: 0, total: 0 });
 
     try {
-      const [systemPlayers, allClubPlayersList] = await Promise.all([
+      const [systemPlayers, allRegistered] = await Promise.all([
         getRegisteredPlayers(effectiveGender, effectiveAgeClass),
-        getAllClubPlayers(),
+        getAllRegisteredPlayers(),
       ]);
+
+      // Only consider players registered for the same gender
+      const sameGenderRegistered = allRegistered.filter(
+        (rp) => rp.gender === effectiveGender,
+      );
 
       const total = systemPlayers.length + pdfPlayers.length;
       setProgress({ done: 0, total });
@@ -501,17 +511,27 @@ export function EntryListCheck() {
         }
       }
 
-      // Direction 2: PDF → system (only show club players)
+      // Direction 2: PDF → system
+      // Only show players who are registered (checkbox set) for the same
+      // gender but NOT for the selected age class — these are players the
+      // club actively manages who might be missing from this age class.
       const notInSystem: UnmatchedPdfPlayer[] = [];
 
       for (let i = 0; i < pdfPlayers.length; i++) {
         const pp = pdfPlayers[i];
         if (matchedPdfKeys.has(pdfPlayerKey(pp))) continue;
 
-        if (isClubPlayer(pp, allClubPlayersList)) {
+        const registeredPlayer = findRegisteredPlayer(pp, sameGenderRegistered);
+        if (
+          registeredPlayer &&
+          !registeredPlayer.age_classes.includes(effectiveAgeClass)
+        ) {
+          const otherClasses = registeredPlayer.age_classes
+            .map((ac) => AGE_CLASS_CONFIG[ac].label)
+            .join(", ");
           notInSystem.push({
             pdfPlayer: pp,
-            detail: "In der Meldeliste, aber nicht für diese Altersklasse gemeldet",
+            detail: `Gemeldet für ${otherClasses}, aber nicht für ${AGE_CLASS_CONFIG[effectiveAgeClass].label}`,
           });
         }
 

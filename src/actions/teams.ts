@@ -1,7 +1,7 @@
 "use server";
 
 import { requireAdmin, getUserProfile } from "@/lib/auth";
-import type { Gender, AgeClass, Team, UserProfile, Player } from "@/lib/types";
+import type { Gender, AgeClass, Team, UserProfile } from "@/lib/types";
 import { withClubContext } from "@/lib/club";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -247,6 +247,7 @@ export interface RegisteredPlayerWithAgeClasses {
   last_name: string;
   birth_date: string;
   gender: Gender;
+  license: string | null;
   age_classes: AgeClass[];
 }
 
@@ -257,7 +258,7 @@ export async function getAllRegisteredPlayers(): Promise<RegisteredPlayerWithAge
   return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase
       .from("player_registrations")
-      .select("gender, age_class, players!inner(uuid, first_name, last_name, birth_date, gender)")
+      .select("gender, age_class, players!inner(uuid, first_name, last_name, birth_date, gender, license)")
       .eq("players.club_id", clubId)
       .is("players.deleted_at", null);
 
@@ -279,6 +280,7 @@ export async function getAllRegisteredPlayers(): Promise<RegisteredPlayerWithAge
           last_name: p.last_name,
           birth_date: p.birth_date,
           gender: p.gender,
+          license: p.license,
           age_classes: [row.age_class as AgeClass],
         });
       }
@@ -349,19 +351,5 @@ export async function getTeamMatches(teamId: string) {
       .order("match_time");
     if (error) throw error;
     return (data ?? []) as import("@/lib/types").Match[];
-  });
-}
-
-/** Returns ALL club players (not just registered ones) for reverse PDF matching */
-export async function getAllClubPlayers() {
-  await requireAdmin();
-  return withClubContext(async (supabase, clubId) => {
-    const { data, error } = await supabase
-      .from("players")
-      .select("uuid, first_name, last_name, license, birth_date, gender")
-      .eq("club_id", clubId)
-      .is("deleted_at", null);
-    if (error) throw error;
-    return data as Pick<Player, "uuid" | "first_name" | "last_name" | "license" | "birth_date" | "gender">[];
   });
 }
