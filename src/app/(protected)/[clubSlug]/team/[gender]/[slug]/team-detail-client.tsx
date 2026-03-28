@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Pencil, UserMinus, UserPlus, Loader2, List, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MapPin, Calendar, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Team, Player, Match, EventOccurrence, EventResponse } from "@/lib/types";
 import { getAge } from "@/lib/players";
 import {
@@ -51,6 +53,25 @@ function formatTime(t: string | null) {
 }
 
 export function TeamDetailClient({ team, captains: initialCaptains, players, blockedCount, matches, eventOccurrences, myResponses, isAdmin, isCaptain, clubSlug }: TeamDetailClientProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const validTabs = ["termine", "meldeliste", "settings"] as const;
+  const tabParam = searchParams.get("tab");
+  const activeTab = validTabs.includes(tabParam as typeof validTabs[number]) ? (tabParam as string) : "termine";
+
+  const setTab = useCallback((value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "termine") {
+      params.delete("tab");
+    } else {
+      params.set("tab", value);
+    }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [searchParams, router, pathname]);
+
   const [sheetOpen, setSheetOpen] = useState(false);
   const [eventFormOpen, setEventFormOpen] = useState(false);
   const [captains, setCaptains] = useState(initialCaptains);
@@ -84,7 +105,7 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <nav className="sm:hidden">
           <Link
@@ -118,184 +139,197 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
         </div>
       </div>
 
-      {/* Captains */}
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Mannschaftsführer</h3>
-        {captains.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Keine Mannschaftsführer zugeordnet</p>
-        ) : (
-          <ul className="space-y-2">
-            {captains.map((captain) => (
-              <li key={captain.id} className="flex items-center justify-between rounded-md border bg-white px-4 py-2">
-                <span className="text-sm">{captain.email}</span>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveCaptain(captain.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <UserMinus className="h-4 w-4" />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {isAdmin && (
-          <form onSubmit={handleInvite} className="flex items-center gap-2">
-            <Input
-              type="email"
-              placeholder="E-Mail-Adresse"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              required
-              className="max-w-xs"
-            />
-            <Button type="submit" size="sm" disabled={isPending}>
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              <span className="ml-1">Einladen</span>
-            </Button>
-          </form>
-        )}
-      </section>
+      <Tabs value={activeTab} onValueChange={setTab}>
+        <TabsList variant="line">
+          <TabsTrigger value="termine">Termine</TabsTrigger>
+          <TabsTrigger value="meldeliste">Meldeliste</TabsTrigger>
+          {(isAdmin || isCaptain) && (
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Invite link */}
-      {(isAdmin || isCaptain) && (
-        <section className="space-y-3">
-          <h3 className="text-lg font-semibold">Einladungslink</h3>
-          <InviteLink teamId={team.id} inviteToken={team.invite_token} />
-        </section>
-      )}
-
-      {/* Registered players */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Gemeldete Spieler ({players.length})</h3>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/${clubSlug}/players/${team.gender}/${team.age_class}`}>
-              <List className="mr-2 h-4 w-4" />
-              Meldeliste bearbeiten
-            </Link>
-          </Button>
-        </div>
-        {players.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Keine Spieler gemeldet.</p>
-        ) : (
-          <div className="rounded-md border bg-white">
-            {blockedPlayers.length > 0 && (
-              <button
-                onClick={() => setShowBlocked(!showBlocked)}
-                className="flex w-full items-center justify-center gap-1 border-b py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showBlocked ? (
-                  <>Gesperrte Spieler ausblenden <ChevronUp className="h-4 w-4" /></>
-                ) : (
-                  <>{blockedPlayers.length} gesperrte Spieler <ChevronDown className="h-4 w-4" /></>
-                )}
-              </button>
-            )}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Alter</TableHead>
-                  <TableHead className="text-center">LK</TableHead>
-                  <TableHead>Lizenz</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {showBlocked && blockedPlayers.map((player, i) => (
-                  <TableRow key={player.uuid} className="text-muted-foreground">
-                    <TableCell className="font-medium">{i + 1}</TableCell>
-                    <TableCell>{player.last_name}, {player.first_name}</TableCell>
-                    <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
-                    <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
-                    <TableCell>{player.license || "—"}</TableCell>
-                  </TableRow>
-                ))}
-                {corePlayers.map((player, i) => (
-                  <TableRow key={player.uuid}>
-                    <TableCell className="font-medium">{blockedCount + i + 1}</TableCell>
-                    <TableCell>{player.last_name}, {player.first_name}</TableCell>
-                    <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
-                    <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
-                    <TableCell>{player.license || "—"}</TableCell>
-                  </TableRow>
-                ))}
-                {showRemaining && remainingPlayers.map((player, i) => (
-                  <TableRow key={player.uuid}>
-                    <TableCell className="font-medium">{blockedCount + team.team_size + i + 1}</TableCell>
-                    <TableCell>{player.last_name}, {player.first_name}</TableCell>
-                    <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
-                    <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
-                    <TableCell>{player.license || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {remainingPlayers.length > 0 && (
-              <button
-                onClick={() => setShowRemaining(!showRemaining)}
-                className="flex w-full items-center justify-center gap-1 border-t py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showRemaining ? (
-                  <>Weniger anzeigen <ChevronUp className="h-4 w-4" /></>
-                ) : (
-                  <>{remainingPlayers.length} weitere Spieler <ChevronDown className="h-4 w-4" /></>
-                )}
-              </button>
+        {/* Termine */}
+        <TabsContent value="termine" className="space-y-3 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Termine ({eventOccurrences.length || matches.length})</h3>
+            {(isAdmin || isCaptain) && (
+              <Button size="sm" variant="outline" onClick={() => setEventFormOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                Neuer Termin
+              </Button>
             )}
           </div>
-        )}
-      </section>
-
-      {/* Termine */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Termine ({eventOccurrences.length || matches.length})</h3>
-          {(isAdmin || isCaptain) && (
-            <Button size="sm" variant="outline" onClick={() => setEventFormOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Neuer Termin
-            </Button>
-          )}
-        </div>
-        {eventOccurrences.length > 0 ? (
-          <EventList occurrences={eventOccurrences} myResponses={myResponses} />
-        ) : matches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Termine geplant.</p>
-        ) : (
-          <div className="space-y-2">
-            {matches.map((match) => (
-              <div key={match.id} className="flex items-start gap-3 rounded-md border bg-white px-4 py-3">
-                <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-sm font-medium">
-                      {match.home_team} – {match.away_team}
-                    </span>
-                    {match.is_home && (
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Heim</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                    <span>{formatDate(match.match_date)}{match.match_time ? `, ${formatTime(match.match_time)}` : ""}</span>
-                    {match.location && (
-                      <span className="flex items-center gap-0.5">
-                        <MapPin className="h-3 w-3" />
-                        {match.location}
+          {eventOccurrences.length > 0 ? (
+            <EventList occurrences={eventOccurrences} myResponses={myResponses} />
+          ) : matches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Noch keine Termine geplant.</p>
+          ) : (
+            <div className="space-y-2">
+              {matches.map((match) => (
+                <div key={match.id} className="flex items-start gap-3 border bg-white px-4 py-3">
+                  <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm font-medium">
+                        {match.home_team} – {match.away_team}
                       </span>
-                    )}
-                    {match.match_number && <span>Spiel-Nr. {match.match_number}</span>}
+                      {match.is_home && (
+                        <span className="bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Heim</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <span>{formatDate(match.match_date)}{match.match_time ? `, ${formatTime(match.match_time)}` : ""}</span>
+                      {match.location && (
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="h-3 w-3" />
+                          {match.location}
+                        </span>
+                      )}
+                      {match.match_number && <span>Spiel-Nr. {match.match_number}</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Meldeliste */}
+        <TabsContent value="meldeliste" className="space-y-3 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Gemeldete Spieler ({players.length})</h3>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/${clubSlug}/players/${team.gender}/${team.age_class}`}>
+                <List className="mr-2 h-4 w-4" />
+                Meldeliste bearbeiten
+              </Link>
+            </Button>
           </div>
+          {players.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Keine Spieler gemeldet.</p>
+          ) : (
+            <div className="border bg-white">
+              {blockedPlayers.length > 0 && (
+                <button
+                  onClick={() => setShowBlocked(!showBlocked)}
+                  className="flex w-full items-center justify-center gap-1 border-b py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showBlocked ? (
+                    <>Gesperrte Spieler ausblenden <ChevronUp className="h-4 w-4" /></>
+                  ) : (
+                    <>{blockedPlayers.length} gesperrte Spieler <ChevronDown className="h-4 w-4" /></>
+                  )}
+                </button>
+              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-center">Alter</TableHead>
+                    <TableHead className="text-center">LK</TableHead>
+                    <TableHead>Lizenz</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {showBlocked && blockedPlayers.map((player, i) => (
+                    <TableRow key={player.uuid} className="text-muted-foreground">
+                      <TableCell className="font-medium">{i + 1}</TableCell>
+                      <TableCell>{player.last_name}, {player.first_name}</TableCell>
+                      <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
+                      <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
+                      <TableCell>{player.license || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                  {corePlayers.map((player, i) => (
+                    <TableRow key={player.uuid}>
+                      <TableCell className="font-medium">{blockedCount + i + 1}</TableCell>
+                      <TableCell>{player.last_name}, {player.first_name}</TableCell>
+                      <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
+                      <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
+                      <TableCell>{player.license || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                  {showRemaining && remainingPlayers.map((player, i) => (
+                    <TableRow key={player.uuid}>
+                      <TableCell className="font-medium">{blockedCount + team.team_size + i + 1}</TableCell>
+                      <TableCell>{player.last_name}, {player.first_name}</TableCell>
+                      <TableCell className="text-center">{getAge(player.birth_date)}</TableCell>
+                      <TableCell className="text-center">{player.skill_level ?? "–"}</TableCell>
+                      <TableCell>{player.license || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {remainingPlayers.length > 0 && (
+                <button
+                  onClick={() => setShowRemaining(!showRemaining)}
+                  className="flex w-full items-center justify-center gap-1 border-t py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showRemaining ? (
+                    <>Weniger anzeigen <ChevronUp className="h-4 w-4" /></>
+                  ) : (
+                    <>{remainingPlayers.length} weitere Spieler <ChevronDown className="h-4 w-4" /></>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Settings */}
+        {(isAdmin || isCaptain) && (
+          <TabsContent value="settings" className="space-y-8 pt-4">
+            {/* Captains */}
+            <section className="space-y-3">
+              <h3 className="text-lg font-semibold">Mannschaftsführer</h3>
+              {captains.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Keine Mannschaftsführer zugeordnet</p>
+              ) : (
+                <ul className="space-y-2">
+                  {captains.map((captain) => (
+                    <li key={captain.id} className="flex items-center justify-between border bg-white px-4 py-2">
+                      <span className="text-sm">{captain.email}</span>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveCaptain(captain.id)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {isAdmin && (
+                <form onSubmit={handleInvite} className="flex items-center gap-2">
+                  <Input
+                    type="email"
+                    placeholder="E-Mail-Adresse"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    className="max-w-xs"
+                  />
+                  <Button type="submit" size="sm" disabled={isPending}>
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                    <span className="ml-1">Einladen</span>
+                  </Button>
+                </form>
+              )}
+            </section>
+
+            {/* Invite link */}
+            <section className="space-y-3">
+              <h3 className="text-lg font-semibold">Einladungslink</h3>
+              <InviteLink teamId={team.id} inviteToken={team.invite_token} />
+            </section>
+          </TabsContent>
         )}
-      </section>
+      </Tabs>
 
       {isAdmin && (
         <TeamDetailSheet
