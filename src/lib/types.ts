@@ -145,6 +145,7 @@ export interface Member {
   birth_date: string | null;
   email: string | null;
   player_uuid: string | null;
+  source: string;
   created_at: string;
 }
 

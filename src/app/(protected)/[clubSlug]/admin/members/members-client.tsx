@@ -108,6 +108,9 @@ export function MembersClient({
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">
                     {m.last_name}, {m.first_name}
+                    {m.source === "invite" && (
+                      <span className="ml-2 bg-golden/10 px-1.5 py-0.5 text-xs text-golden">Selbst registriert</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{m.email ?? "–"}</TableCell>
                   <TableCell>

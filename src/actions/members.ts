@@ -318,6 +318,8 @@ export async function registerViaInvite(
     .limit(1)
     .maybeSingle();
 
+  let memberId: string | null = null;
+
   if (existingMember) {
     // Link user to existing member
     await admin
@@ -325,10 +327,43 @@ export async function registerViaInvite(
       .update({ user_id: userId })
       .eq("id", existingMember.id);
 
+    // Copy player_uuid to user profile if available
+    if (existingMember.player_uuid) {
+      await admin
+        .from("user_profiles")
+        .update({ player_uuid: existingMember.player_uuid })
+        .eq("id", userId);
+    }
+
     // Create team assignment
     await admin
       .from("member_team_assignments")
       .upsert({ member_id: existingMember.id, team_id: team.id }, { onConflict: "member_id,team_id" });
+
+    memberId = existingMember.id;
+  } else {
+    // Create new member record
+    const { data: newMember, error: memberError } = await admin
+      .from("members")
+      .insert({
+        club_id: team.club_id,
+        user_id: userId,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        birth_date: birthDate,
+        email: formData.email,
+        source: "invite",
+      })
+      .select("id")
+      .single();
+    if (memberError) { await rollbackAuthUser(); throw new Error("Mitglied konnte nicht erstellt werden"); }
+
+    // Create team assignment
+    await admin
+      .from("member_team_assignments")
+      .upsert({ member_id: newMember.id, team_id: team.id }, { onConflict: "member_id,team_id" });
+
+    memberId = newMember.id;
   }
 
   // Log
@@ -336,7 +371,7 @@ export async function registerViaInvite(
     event_type: "member_register",
     gender: "male",
     details: {
-      member_id: existingMember?.id ?? null,
+      member_id: memberId,
       team_id: team.id,
       linked: !!existingMember,
     },
