@@ -170,13 +170,12 @@ export default function TeamsPage() {
                     )}
                     <span className="opacity-40">|</span>
                     <span>{team.team_size}er</span>
-                    {team.league && (
-                      <>
-                        <span className="opacity-40">|</span>
-                        <span className="normal-case tracking-normal font-semibold">{team.league}</span>
-                      </>
-                    )}
                   </div>
+                  {team.league && (
+                    <p className="mt-1 text-[11px] normal-case tracking-normal font-semibold opacity-60">
+                      {team.league}
+                    </p>
+                  )}
                 </div>
 
                 {/* Next match / bottom section */}
