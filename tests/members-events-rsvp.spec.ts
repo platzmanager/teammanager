@@ -145,12 +145,12 @@ test.afterAll(async () => {
 test("admin sees Mitglieder and Termine nav links", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/members"]`)).toBeVisible();
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/events"]`)).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/events"]`).first()).toBeVisible();
 });
 
 test("captain sees Termine but not Mitglieder", async ({ page }) => {
   await loginAs(page, CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/events"]`)).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/events"]`).first()).toBeVisible();
   await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/members"]`)).not.toBeVisible();
 });
 
@@ -160,28 +160,27 @@ test("admin can access members page", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto(`/${CLUB_SLUG}/admin/members`);
   await expect(page.getByRole("heading", { name: "Mitglieder", exact: true })).toBeVisible({ timeout: 10000 });
-  // Should show the backfilled admin + captain members
-  await expect(page.getByRole("heading", { name: "Mitglieder importieren" })).toBeVisible();
+  // Should show the import button
+  await expect(page.getByRole("link", { name: "Importieren" })).toBeVisible();
 });
 
 test("admin can import members via CSV", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto(`/${CLUB_SLUG}/admin/members`);
+  await page.goto(`/${CLUB_SLUG}/admin/members/import`);
   await expect(page.getByText("Mitglieder importieren")).toBeVisible({ timeout: 10000 });
 
   // Upload CSV
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(path.resolve(__dirname, "fixtures", "members.csv"));
 
-  // Wait for preview
-  await expect(page.getByText("3 Mitglieder erkannt")).toBeVisible({ timeout: 5000 });
-  await expect(page.getByRole("cell", { name: "Mustermann" }).first()).toBeVisible();
+  // Wait for file to be parsed
+  await expect(page.getByText("3 Zeilen erkannt")).toBeVisible({ timeout: 5000 });
 
   // Import
   await page.getByRole("button", { name: /Mitglieder importieren/i }).click();
 
   // Wait for result
-  await expect(page.getByText("Importiert")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Neu importiert")).toBeVisible({ timeout: 10000 });
 });
 
 test("imported members appear in member list", async ({ page }) => {
@@ -208,6 +207,7 @@ test("captain can generate invite link on team page", async ({ page }) => {
   const teamSlug = teamData[0]?.slug;
 
   await page.goto(`/${CLUB_SLUG}/team/male/${teamSlug}`);
+  await page.getByRole("tab", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Einladungslink" })).toBeVisible({ timeout: 10000 });
 
   // Generate invite link
@@ -282,10 +282,33 @@ test("new member can register via invite link", async ({ browser }) => {
   await context.close();
 });
 
-test("registered member appears in admin members list", async ({ page }) => {
+test("registered member appears in admin members list with invite badge", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto(`/${CLUB_SLUG}/admin/members`);
   await expect(page.getByText("Mitglied, Neues")).toBeVisible({ timeout: 10000 });
+  // Self-registered members should have the "Selbst registriert" badge
+  const row = page.locator("tr", { hasText: "Mitglied, Neues" });
+  await expect(row.getByText("Selbst registriert")).toBeVisible();
+});
+
+test("registered member has member record and team assignment in DB", async () => {
+  // Verify member record was created with source=invite
+  const membersRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/members?club_id=eq.${clubId}&email=eq.newmember@test.local&select=id,source,user_id`,
+    { headers: serviceHeaders() }
+  );
+  const members = await membersRes.json();
+  expect(members).toHaveLength(1);
+  expect(members[0].source).toBe("invite");
+  expect(members[0].user_id).toBeTruthy();
+
+  // Verify team assignment exists
+  const assignRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/member_team_assignments?member_id=eq.${members[0].id}&team_id=eq.${teamId}&select=member_id`,
+    { headers: serviceHeaders() }
+  );
+  const assignments = await assignRes.json();
+  expect(assignments).toHaveLength(1);
 });
 
 test("invalid invite token shows 404", async ({ page }) => {
@@ -370,27 +393,53 @@ test("member can RSVP to an event", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto(`/${CLUB_SLUG}/events`);
 
-  // Find the Saisonabschluss event and click Zusage
+  // Find the Saisonabschluss event and click Ja (accept)
   const eventCard = page.locator("text=Saisonabschluss").locator("..").locator("..");
-  const zusageButton = eventCard.getByRole("button", { name: "Zusage" });
-  await expect(zusageButton).toBeVisible({ timeout: 10000 });
-  await zusageButton.click();
+  const jaButton = eventCard.getByRole("button", { name: "Ja" });
+  await expect(jaButton).toBeVisible({ timeout: 10000 });
+  await jaButton.click();
 
-  // Button should be highlighted (green active state)
-  await expect(zusageButton).toHaveClass(/bg-green/, { timeout: 5000 });
+  // Button should be highlighted (verdigris active state)
+  await expect(jaButton).toHaveClass(/bg-verdigris/, { timeout: 5000 });
 });
 
-test("member can change RSVP to Absage", async ({ page }) => {
+test("member can change RSVP to Nein", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto(`/${CLUB_SLUG}/events`);
 
   const eventCard = page.locator("text=Saisonabschluss").locator("..").locator("..");
-  const absageButton = eventCard.getByRole("button", { name: "Absage" });
-  await expect(absageButton).toBeVisible({ timeout: 10000 });
-  await absageButton.click();
+  const neinButton = eventCard.getByRole("button", { name: "Nein" });
+  await expect(neinButton).toBeVisible({ timeout: 10000 });
+  await neinButton.click();
 
-  // Absage button should now be highlighted (red)
-  await expect(absageButton).toHaveClass(/bg-red/, { timeout: 5000 });
+  // Nein button should now be highlighted (destructive/red)
+  await expect(neinButton).toHaveClass(/bg-destructive/, { timeout: 5000 });
+});
+
+// ─── Player RSVP via Invite Tests ───
+
+test("registered player can see team events and RSVP", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  // Log in as the newly registered player
+  await loginAs(page, "newmember@test.local", "test123456");
+  await page.goto(`/${CLUB_SLUG}/events`);
+  await expect(page.getByRole("heading", { name: "Termine" })).toBeVisible({ timeout: 10000 });
+
+  // Should see the team event created by the captain (Mannschaftstraining)
+  await expect(page.getByText("Mannschaftstraining").first()).toBeVisible({ timeout: 10000 });
+
+  // Should see RSVP buttons and be able to RSVP with "Ja"
+  const eventCard = page.locator("text=Mannschaftstraining").first().locator("..").locator("..");
+  const jaButton = eventCard.getByRole("button", { name: "Ja" });
+  await expect(jaButton).toBeVisible({ timeout: 5000 });
+  await jaButton.click();
+
+  // Button should become active (verdigris background)
+  await expect(jaButton).toHaveClass(/bg-verdigris/, { timeout: 5000 });
+
+  await context.close();
 });
 
 // ─── Calendar Tests ───

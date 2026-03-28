@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUserProfile } from "@/lib/auth";
+import { getUserProfile, getMemberTeamIds } from "@/lib/auth";
 import { getMemberEvents } from "@/actions/events";
 import { getMyResponses } from "@/actions/rsvp";
 import { EventsClient } from "./events-client";
@@ -13,7 +13,10 @@ export default async function EventsPage({
   const profile = await getUserProfile();
   if (!profile) redirect("/login");
 
-  const teamIds = (profile.teams ?? []).map((t) => t.id);
+  // Combine teams from user_team_assignments (admin/captain) and member_team_assignments (player)
+  const userTeamIds = (profile.teams ?? []).map((t) => t.id);
+  const memberTeamIds = await getMemberTeamIds();
+  const teamIds = [...new Set([...userTeamIds, ...memberTeamIds])];
   const occurrences = await getMemberEvents(teamIds);
   const occurrenceIds = occurrences.map((o) => o.id);
   const myResponses = await getMyResponses(occurrenceIds);

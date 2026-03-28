@@ -93,3 +93,27 @@ export async function getMemberForUser(): Promise<Member | null> {
 
   return data as Member | null;
 }
+
+export async function getMemberTeamIds(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const clubId = await getCurrentClubId();
+  if (!clubId) return [];
+
+  const { data: member } = await supabase
+    .from("members")
+    .select("id")
+    .eq("club_id", clubId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!member) return [];
+
+  const { data: assignments } = await supabase
+    .from("member_team_assignments")
+    .select("team_id")
+    .eq("member_id", member.id);
+
+  return (assignments ?? []).map((a) => a.team_id);
+}
