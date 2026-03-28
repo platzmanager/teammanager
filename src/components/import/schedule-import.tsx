@@ -53,7 +53,10 @@ function parseAltersklasse(raw: string): { gender: "male" | "female"; age_class:
     const num = trimmed.replace("Herren", "").trim();
     return { gender: "male", age_class: num || "all" };
   }
-  return { gender: "male", age_class: "all" };
+  // Jugend: keep full value as age_class, derive gender from prefix
+  const femalePrefixes = ["Juniorinnen", "Mädchen"];
+  const isFemale = femalePrefixes.some((p) => trimmed.startsWith(p));
+  return { gender: isFemale ? "female" : "male", age_class: trimmed };
 }
 
 function parseDateDE(dateStr: string): string {
