@@ -37,11 +37,14 @@ interface UnlinkedUser {
 
 interface ImportResult {
   count: number;
+  inserted: number;
+  updated: number;
   total: number;
   skipped: { row: number; name: string; reason: string }[];
 }
 
 interface ParsedMember {
+  external_id: string;
   first_name: string;
   last_name: string;
   birth_date: string;
@@ -96,6 +99,7 @@ export function MembersClient({
       });
 
       const mapped: ParsedMember[] = parsed.data.map((r) => ({
+        external_id: r["Mitgliedsnummer"] ?? r["Nr."] ?? r["external_id"] ?? r["ID"] ?? "",
         first_name: r["Vorname"] ?? r["first_name"] ?? "",
         last_name: r["Nachname"] ?? r["last_name"] ?? "",
         birth_date: r["Geburtsdatum"] ?? r["birth_date"] ?? "",
@@ -318,6 +322,7 @@ export function MembersClient({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Nr.</TableHead>
                       <TableHead>Vorname</TableHead>
                       <TableHead>Nachname</TableHead>
                       <TableHead>Geburtsdatum</TableHead>
@@ -327,6 +332,7 @@ export function MembersClient({
                   <TableBody>
                     {previewRows.map((row, ri) => (
                       <TableRow key={ri}>
+                        <TableCell className="text-muted-foreground">{row.external_id || "–"}</TableCell>
                         <TableCell>{row.first_name}</TableCell>
                         <TableCell>{row.last_name}</TableCell>
                         <TableCell>{row.birth_date}</TableCell>
@@ -357,14 +363,23 @@ export function MembersClient({
         {/* Result */}
         {result && (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="flex items-center gap-2.5 border bg-verdigris/10 p-3">
                 <CheckCircle2 className="h-5 w-5 text-verdigris shrink-0" />
                 <div>
-                  <p className="text-2xl font-bold text-verdigris">{result.count}</p>
-                  <p className="text-xs text-verdigris">Importiert</p>
+                  <p className="text-2xl font-bold text-verdigris">{result.inserted}</p>
+                  <p className="text-xs text-verdigris">Neu importiert</p>
                 </div>
               </div>
+              {result.updated > 0 && (
+                <div className="flex items-center gap-2.5 border bg-blue-50 p-3">
+                  <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0" />
+                  <div>
+                    <p className="text-2xl font-bold text-blue-700">{result.updated}</p>
+                    <p className="text-xs text-blue-600">Aktualisiert</p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2.5 border bg-golden/10 p-3">
                 <AlertTriangle className="h-5 w-5 text-golden shrink-0" />
                 <div>

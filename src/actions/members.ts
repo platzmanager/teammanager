@@ -20,6 +20,7 @@ export async function getMembers() {
 }
 
 interface ImportMember {
+  external_id?: string;
   first_name: string;
   last_name: string;
   birth_date?: string;
@@ -38,13 +39,16 @@ export async function importMembers(members: ImportMember[]) {
     // Fetch existing members for duplicate checking
     const { data: allExisting } = await supabase
       .from("members")
-      .select("first_name, last_name, email")
+      .select("first_name, last_name, email, external_id")
       .eq("club_id", clubId);
 
-    const existingSet = new Set(
+    const existingNameSet = new Set(
       (allExisting ?? []).map(
         (e) => `${e.first_name.toLowerCase()}|${e.last_name.toLowerCase()}`
       )
+    );
+    const existingExtIds = new Set(
+      (allExisting ?? []).filter((e) => e.external_id).map((e) => e.external_id)
     );
 
     for (let i = 0; i < members.length; i++) {
@@ -53,13 +57,19 @@ export async function importMembers(members: ImportMember[]) {
       if (!m.first_name) { skipped.push({ row: i + 1, name, reason: "Vorname fehlt" }); continue; }
       if (!m.last_name) { skipped.push({ row: i + 1, name, reason: "Nachname fehlt" }); continue; }
 
+      // Members with external_id are always valid (upsert)
+      if (m.external_id) {
+        valid.push(m);
+        continue;
+      }
+
       const key = `${m.first_name.toLowerCase()}|${m.last_name.toLowerCase()}`;
-      if (existingSet.has(key)) {
+      if (existingNameSet.has(key)) {
         skipped.push({ row: i + 1, name, reason: "Mitglied existiert bereits" });
         continue;
       }
 
-      existingSet.add(key);
+      existingNameSet.add(key);
       valid.push(m);
     }
 
@@ -76,7 +86,10 @@ export async function importMembers(members: ImportMember[]) {
       playerMap.set(key, p.uuid);
     }
 
-    const rows = valid.map((m) => {
+    const upsertRows: Record<string, unknown>[] = [];
+    const insertRows: Record<string, unknown>[] = [];
+
+    for (const m of valid) {
       let birthDate = m.birth_date || null;
       if (birthDate) {
         const dotMatch = birthDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
@@ -91,7 +104,8 @@ export async function importMembers(members: ImportMember[]) {
         playerUuid = playerMap.get(key) ?? null;
       }
 
-      return {
+      const row = {
+        external_id: m.external_id || null,
         first_name: m.first_name,
         last_name: m.last_name,
         birth_date: birthDate,
@@ -99,29 +113,48 @@ export async function importMembers(members: ImportMember[]) {
         player_uuid: playerUuid,
         club_id: clubId,
       };
-    });
 
-    if (rows.length === 0) {
-      return { count: 0, total: members.length, skipped };
+      if (m.external_id && existingExtIds.has(m.external_id)) {
+        upsertRows.push(row);
+      } else {
+        insertRows.push(row);
+      }
     }
 
-    const { error } = await supabase.from("members").insert(rows);
-    if (error) {
-      console.error("Member import error:", JSON.stringify(error, null, 2));
-      throw new Error("Datenbankfehler beim Import. Bitte Daten prüfen.");
+    let inserted = 0;
+    let updated = 0;
+
+    if (upsertRows.length > 0) {
+      const { error } = await supabase
+        .from("members")
+        .upsert(upsertRows, { onConflict: "club_id,external_id" });
+      if (error) {
+        console.error("Member upsert error:", JSON.stringify(error, null, 2));
+        throw new Error("Datenbankfehler beim Upsert. Bitte Daten prüfen.");
+      }
+      updated = upsertRows.length;
+    }
+
+    if (insertRows.length > 0) {
+      const { error } = await supabase.from("members").insert(insertRows);
+      if (error) {
+        console.error("Member import error:", JSON.stringify(error, null, 2));
+        throw new Error("Datenbankfehler beim Import. Bitte Daten prüfen.");
+      }
+      inserted = insertRows.length;
     }
 
     await supabase.from("event_log").insert({
       event_type: "member_import",
       gender: "male",
-      details: { count: rows.length },
+      details: { inserted, updated, total: members.length },
       user_id: user?.id ?? null,
       club_id: clubId,
     });
 
     revalidatePath("/", "layout");
 
-    return { count: rows.length, total: members.length, skipped };
+    return { count: inserted + updated, inserted, updated, total: members.length, skipped };
   });
 }
 

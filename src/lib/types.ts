@@ -139,6 +139,7 @@ export interface Member {
   id: string;
   club_id: string;
   user_id: string | null;
+  external_id: string | null;
   first_name: string;
   last_name: string;
   birth_date: string | null;
