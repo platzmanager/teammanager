@@ -3,9 +3,15 @@ import { getUserProfile } from "@/lib/auth";
 import { getMembers, getUnmatchedMembers, getUnlinkedUsers } from "@/actions/members";
 import { MembersClient } from "./members-client";
 
-export default async function MembersPage() {
+export default async function MembersPage({
+  params,
+}: {
+  params: Promise<{ clubSlug: string }>;
+}) {
   const profile = await getUserProfile();
   if (!profile || profile.role !== "admin") redirect("/login");
+
+  const { clubSlug } = await params;
 
   const [members, unmatched, unlinkedUsers] = await Promise.all([
     getMembers(),
@@ -20,6 +26,7 @@ export default async function MembersPage() {
         members={members}
         unmatchedCount={unmatched.length}
         unlinkedUsers={unlinkedUsers}
+        clubSlug={clubSlug}
       />
     </div>
   );
