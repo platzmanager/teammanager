@@ -239,6 +239,130 @@ export async function getTeamByInviteToken(token: string) {
   return data;
 }
 
+/**
+ * Check if a member with the given name+birth_date already has an auth account.
+ * Returns the masked email if yes, null if no existing account.
+ */
+export async function checkExistingAccount(
+  token: string,
+  firstName: string,
+  lastName: string,
+  birthDate: string
+): Promise<string | null> {
+  const admin = createAdminClient();
+
+  const { data: team } = await admin
+    .from("teams")
+    .select("id, club_id")
+    .eq("invite_token", token)
+    .maybeSingle();
+  if (!team) return null;
+
+  const { data: member } = await admin
+    .from("members")
+    .select("id, user_id, email")
+    .eq("club_id", team.club_id)
+    .ilike("first_name", firstName.trim())
+    .ilike("last_name", lastName.trim())
+    .eq("birth_date", birthDate)
+    .not("user_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!member?.user_id) return null;
+
+  // Get the email from auth user to show masked version
+  const { data: { user } } = await admin.auth.admin.getUserById(member.user_id);
+  if (!user?.email) return null;
+
+  // Mask email: f•••@gmail.com
+  const [local, domain] = user.email.split("@");
+  const masked = local[0] + "•••@" + domain;
+  return masked;
+}
+
+/**
+ * Join a team as an already logged-in user.
+ */
+export async function joinTeamAsLoggedInUser(token: string) {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht eingeloggt");
+
+  const admin = createAdminClient();
+
+  const { data: team } = await admin
+    .from("teams")
+    .select("id, club_id")
+    .eq("invite_token", token)
+    .maybeSingle();
+  if (!team) throw new Error("Ungültiger Einladungslink");
+
+  // Ensure club membership
+  await admin
+    .from("user_clubs")
+    .upsert({ user_id: user.id, club_id: team.club_id }, { onConflict: "user_id,club_id" });
+
+  // Find or create member
+  const { data: existingMember } = await admin
+    .from("members")
+    .select("id")
+    .eq("club_id", team.club_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  let memberId: string;
+  if (existingMember) {
+    memberId = existingMember.id;
+  } else {
+    // Try match by email
+    const { data: emailMatch } = await admin
+      .from("members")
+      .select("id")
+      .eq("club_id", team.club_id)
+      .ilike("email", user.email ?? "")
+      .is("user_id", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (emailMatch) {
+      await admin.from("members").update({ user_id: user.id }).eq("id", emailMatch.id);
+      memberId = emailMatch.id;
+    } else {
+      // Get profile data for the member record
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("first_name, last_name, birth_date")
+        .eq("id", user.id)
+        .single();
+
+      const { data: newMember, error } = await admin
+        .from("members")
+        .insert({
+          club_id: team.club_id,
+          user_id: user.id,
+          first_name: profile?.first_name ?? "",
+          last_name: profile?.last_name ?? "",
+          birth_date: profile?.birth_date,
+          email: user.email,
+          source: "invite",
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error("Mitglied konnte nicht erstellt werden");
+      memberId = newMember.id;
+    }
+  }
+
+  // Add team assignment
+  await admin
+    .from("member_team_assignments")
+    .upsert({ member_id: memberId, team_id: team.id }, { onConflict: "member_id,team_id" });
+
+  return { success: true };
+}
+
 export async function registerViaInvite(
   token: string,
   formData: { first_name: string; last_name: string; birth_date: string; email: string; password: string }
@@ -311,7 +435,7 @@ export async function registerViaInvite(
   // Try to find and link existing member (by name+birth_date, or email if unlinked)
   const { data: existingMember } = await admin
     .from("members")
-    .select("id, player_uuid")
+    .select("id, player_uuid, user_id")
     .eq("club_id", team.club_id)
     .or(`and(first_name.ilike.${formData.first_name.trim()},last_name.ilike.${formData.last_name.trim()},birth_date.eq.${birthDate}),and(email.ilike.${formData.email},user_id.is.null)`)
     .limit(1)
@@ -320,7 +444,13 @@ export async function registerViaInvite(
   let memberId: string | null = null;
 
   if (existingMember) {
-    // Link user to existing member (overwrites old user_id for re-registrations)
+    // If member already has a different auth user, don't overwrite — they should log in instead
+    if (existingMember.user_id && existingMember.user_id !== userId) {
+      await rollbackAuthUser();
+      throw new Error("Du hast bereits ein Konto. Bitte melde dich an und öffne den Einladungslink erneut.");
+    }
+
+    // Link user to existing member
     await admin
       .from("members")
       .update({ user_id: userId })

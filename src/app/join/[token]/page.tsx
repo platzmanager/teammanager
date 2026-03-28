@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { getTeamByInviteToken } from "@/actions/members";
 import { JoinForm } from "./join-form";
 
@@ -16,19 +17,29 @@ export default async function JoinPage({
 
   const club = team.club as { id: string; name: string; slug: string };
 
+  // Check if user is already logged in
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Registrieren
+            {user ? "Team beitreten" : "Registrieren"}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             Tritt <span className="font-medium">{team.name}</span> bei{" "}
             <span className="font-medium">{club.name}</span> bei
           </p>
         </div>
-        <JoinForm token={token} teamName={team.name} clubName={club.name} />
+        <JoinForm
+          token={token}
+          teamName={team.name}
+          clubName={club.name}
+          clubSlug={club.slug}
+          loggedInEmail={user?.email ?? null}
+        />
       </div>
     </div>
   );

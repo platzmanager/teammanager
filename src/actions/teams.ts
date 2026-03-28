@@ -157,8 +157,10 @@ export async function getTeamCaptains(teamId: string): Promise<{ id: string; ema
 
     const admin = createAdminClient();
     const captains = await Promise.all(
-      data.map(async (d: { members: { user_id: string }[] }) => {
-        const userId = d.members[0].user_id;
+      // Supabase returns the join as object (1:1 FK) or array — handle both
+      data.map(async (d: Record<string, unknown>) => {
+        const members = d.members as { user_id: string } | { user_id: string }[];
+        const userId = Array.isArray(members) ? members[0].user_id : members.user_id;
         const { data: { user } } = await admin.auth.admin.getUserById(userId);
         return { id: userId, email: user?.email ?? userId };
       }),
