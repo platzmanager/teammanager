@@ -214,8 +214,8 @@ CREATE POLICY "Captains can manage team event occurrences"
 
 -- ─── 6. Update user_profiles role: captain/player → user ───
 
-UPDATE user_profiles SET role = 'user' WHERE role IN ('captain', 'player');
 ALTER TABLE user_profiles DROP CONSTRAINT user_profiles_role_check;
+UPDATE user_profiles SET role = 'user' WHERE role IN ('captain', 'player');
 ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_role_check
   CHECK (role IN ('admin', 'user'));
 ALTER TABLE user_profiles ALTER COLUMN role SET DEFAULT 'user';
