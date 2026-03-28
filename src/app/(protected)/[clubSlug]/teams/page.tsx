@@ -2,18 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, Lock, Home, Globe, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Team, Gender, GENDER_LABELS, AGE_CLASS_CONFIG, UserProfile } from "@/lib/types";
-import { getTeams, getSessionProfile, getRegistrationCounts, getPendingMatchCounts } from "@/actions/teams";
+import type { Team, Match, Gender, UserProfile } from "@/lib/types";
+import { GENDER_LABELS, AGE_CLASS_CONFIG } from "@/lib/types";
+import { getTeams, getSessionProfile, getNextMatches, getPendingMatchCounts } from "@/actions/teams";
 import { TeamForm } from "@/components/team-form";
 
 const genderFilters: { value: Gender | "all"; label: string }[] = [
@@ -22,10 +15,40 @@ const genderFilters: { value: Gender | "all"; label: string }[] = [
   { value: "male", label: GENDER_LABELS.male },
 ];
 
+function getGenderColor(gender: Gender) {
+  return gender === "female"
+    ? { bg: "bg-primary", text: "text-primary-foreground" }
+    : { bg: "bg-secondary", text: "text-secondary-foreground" };
+}
+
+function formatMatchDate(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  const weekday = d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+  const day = d.getDate();
+  const month = d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "");
+  return `${weekday}, ${day}. ${month}`;
+}
+
+function formatTime(t: string | null) {
+  if (!t) return null;
+  return t.slice(0, 5);
+}
+
+function getCountdown(iso: string): { label: string; urgent: boolean } | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((new Date(`${iso}T00:00:00`).getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return null;
+  if (diff === 0) return { label: "Heute", urgent: true };
+  if (diff === 1) return { label: "Morgen", urgent: true };
+  if (diff <= 7) return { label: `in ${diff} Tagen`, urgent: false };
+  return null;
+}
+
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [regCounts, setRegCounts] = useState<Record<string, number> | null>(null);
+  const [nextMatches, setNextMatches] = useState<Record<string, Match> | null>(null);
   const [matchCounts, setMatchCounts] = useState<Record<string, number> | null>(null);
   const [genderFilter, setGenderFilter] = useState<Gender | "all">("all");
   const router = useRouter();
@@ -35,20 +58,19 @@ export default function TeamsPage() {
   const userTeamIds = new Set(profile?.teams?.map((t) => t.id) ?? []);
 
   const refresh = async () => {
-    const [data, counts, matches] = await Promise.all([
+    const [data, next, counts] = await Promise.all([
       getTeams(),
-      getRegistrationCounts(),
+      getNextMatches(),
       getPendingMatchCounts(),
     ]);
     setTeams(data);
-    setRegCounts(counts);
-    setMatchCounts(matches);
+    setNextMatches(next);
+    setMatchCounts(counts);
   };
 
   useEffect(() => {
     let cancelled = false;
 
-    // Phase 1: Load teams + profile (fast)
     Promise.all([getTeams(), getSessionProfile()]).then(([data, prof]) => {
       if (!cancelled) {
         setTeams(data);
@@ -58,34 +80,20 @@ export default function TeamsPage() {
       console.error("Failed to load teams:", err);
     });
 
-    // Phase 2: Load registration counts + pending match counts (can be slower)
-    Promise.all([getRegistrationCounts(), getPendingMatchCounts()]).then(([counts, matches]) => {
+    Promise.all([getNextMatches(), getPendingMatchCounts()]).then(([next, counts]) => {
       if (!cancelled) {
-        setRegCounts(counts);
-        setMatchCounts(matches);
+        setNextMatches(next);
+        setMatchCounts(counts);
       }
     }).catch((err) => {
-      console.error("Failed to load counts:", err);
+      console.error("Failed to load match data:", err);
     });
 
     return () => { cancelled = true; };
   }, []);
 
   const filtered = genderFilter === "all" ? teams : teams.filter((t) => t.gender === genderFilter);
-
-  // Total registered players available for this team (registered minus blocked by higher-ranked teams)
-  function getTeamAvailableCount(team: Team): number {
-    if (!regCounts) return 0;
-    const key = `${team.gender}:${team.age_class}`;
-    const totalRegistered = regCounts[key] ?? 0;
-    const sameGroup = teams.filter((t) => t.gender === team.gender && t.age_class === team.age_class);
-    const blockedCount = sameGroup
-      .filter((t) => t.rank < team.rank)
-      .reduce((sum, t) => sum + t.team_size, 0);
-    return Math.max(0, totalRegistered - blockedCount);
-  }
-
-  const countsLoading = regCounts === null || matchCounts === null;
+  const dataLoading = nextMatches === null || matchCounts === null;
 
   return (
     <div className="space-y-4">
@@ -98,6 +106,7 @@ export default function TeamsPage() {
       <div className="inline-flex items-center bg-muted p-1">
         {genderFilters.map(({ value, label }) => (
           <button
+            type="button"
             key={value}
             onClick={() => setGenderFilter(value)}
             className={cn(
@@ -112,66 +121,123 @@ export default function TeamsPage() {
         ))}
       </div>
 
-      <div className="overflow-x-auto border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Geschlecht</TableHead>
-              <TableHead>Altersklasse</TableHead>
-              <TableHead className="text-center">Personen</TableHead>
-              <TableHead className="text-center">Spiele</TableHead>
-              <TableHead className="w-8" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                  Keine Teams vorhanden
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((team) => {
-                const canAccess = isAdmin || userTeamIds.has(team.id);
-                return (
-                  <TableRow
-                    key={team.id}
-                    className={cn(
-                      canAccess ? "cursor-pointer hover:bg-muted/50" : "text-muted-foreground"
+      {/* Team cards */}
+      {filtered.length === 0 ? (
+        <p className="py-8 text-center text-muted-foreground">Keine Teams vorhanden</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((team) => {
+            const canAccess = isAdmin || userTeamIds.has(team.id);
+            const ageLabel = AGE_CLASS_CONFIG[team.age_class]?.label ?? team.age_class;
+            const color = getGenderColor(team.gender);
+            const nextMatch = nextMatches?.[team.id] ?? null;
+            const pendingCount = matchCounts?.[team.id] ?? 0;
+            const countdown = nextMatch ? getCountdown(nextMatch.match_date) : null;
+            const opponent = nextMatch ? (nextMatch.is_home ? nextMatch.away_team : nextMatch.home_team) : null;
+
+            return (
+              <button
+                type="button"
+                key={team.id}
+                disabled={!canAccess}
+                className={cn(
+                  "group relative flex w-full flex-col overflow-hidden border bg-card text-left transition-all",
+                  canAccess
+                    ? "cursor-pointer hover:shadow-lg hover:border-foreground/20"
+                    : "opacity-50 grayscale-[30%]"
+                )}
+                onClick={canAccess ? () => router.push(`/${params.clubSlug}/team/${team.gender}/${team.slug}`) : undefined}
+              >
+                {/* Colored header band */}
+                <div className={cn("relative px-5 py-4", color.bg, color.text)}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="truncate font-display text-xl uppercase tracking-wide leading-tight">
+                      {team.name}
+                    </h3>
+                    {canAccess ? (
+                      <ChevronRight className="h-5 w-5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    ) : (
+                      <Lock className="h-4 w-4 shrink-0 opacity-40" />
                     )}
-                    onClick={canAccess ? () => router.push(`/${params.clubSlug}/team/${team.gender}/${team.slug}`) : undefined}
-                  >
-                    <TableCell className="font-medium">{team.name}</TableCell>
-                    <TableCell>{GENDER_LABELS[team.gender]}</TableCell>
-                    <TableCell>{AGE_CLASS_CONFIG[team.age_class]?.label ?? team.age_class}</TableCell>
-                    <TableCell className="text-center">
-                      {countsLoading ? (
-                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : (() => {
-                        const available = getTeamAvailableCount(team);
-                        return (
-                          <span className={cn(available < team.team_size ? "text-golden" : "text-verdigris")}>
-                            {available}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest opacity-75">
+                    <span>{GENDER_LABELS[team.gender]}</span>
+                    {ageLabel !== "Alle" && (
+                      <>
+                        <span className="opacity-40">|</span>
+                        <span>{ageLabel}</span>
+                      </>
+                    )}
+                    <span className="opacity-40">|</span>
+                    <span>{team.team_size}er</span>
+                    {team.league && (
+                      <>
+                        <span className="opacity-40">|</span>
+                        <span className="normal-case tracking-normal font-semibold">{team.league}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Next match / bottom section */}
+                <div className="flex-1 px-5 py-4">
+                  {dataLoading ? (
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : nextMatch ? (
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Nächstes Spiel
+                        </span>
+                        {countdown && (
+                          <span className={cn(
+                            "px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                            countdown.urgent
+                              ? "bg-destructive text-white"
+                              : "bg-sage text-white"
+                          )}>
+                            {countdown.label}
                           </span>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {countsLoading ? (
-                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : (
-                        <span>{matchCounts?.[team.id] ?? 0}</span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-sm font-bold text-foreground leading-tight">
+                        {opponent}
+                      </p>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className={cn(
+                          "flex items-center gap-1 font-semibold",
+                          nextMatch.is_home ? "text-verdigris" : "text-cerulean"
+                        )}>
+                          {nextMatch.is_home
+                            ? <><Home className="h-3 w-3" /> Heim</>
+                            : <><Globe className="h-3 w-3" /> Auswärts</>
+                          }
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatMatchDate(nextMatch.match_date)}
+                          {formatTime(nextMatch.match_time) && `, ${formatTime(nextMatch.match_time)}`}
+                        </span>
+                      </div>
+                      {pendingCount > 1 && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          +{pendingCount - 1} weitere {pendingCount - 1 === 1 ? "Spiel" : "Spiele"}
+                        </p>
                       )}
-                    </TableCell>
-                    <TableCell>{canAccess && <ChevronRight className="h-4 w-4 text-muted-foreground" />}</TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    </div>
+                  ) : (
+                    <p className="py-1 text-sm text-muted-foreground">
+                      Keine anstehenden Spiele
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

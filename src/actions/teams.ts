@@ -328,6 +328,29 @@ export async function getPendingMatchCounts(): Promise<Record<string, number>> {
   });
 }
 
+/** Returns a map of `team_id` → next upcoming match */
+export async function getNextMatches(): Promise<Record<string, import("@/lib/types").Match>> {
+  return withClubContext(async (supabase, clubId) => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("matches")
+      .select("*")
+      .eq("club_id", clubId)
+      .gte("match_date", today)
+      .order("match_date")
+      .order("match_time");
+    if (error) throw error;
+
+    const result: Record<string, import("@/lib/types").Match> = {};
+    for (const row of data ?? []) {
+      if (!result[row.team_id]) {
+        result[row.team_id] = row as import("@/lib/types").Match;
+      }
+    }
+    return result;
+  });
+}
+
 export async function removeCaptain(teamId: string, userId: string) {
   await requireAdmin();
   return withClubContext(async (supabase) => {
