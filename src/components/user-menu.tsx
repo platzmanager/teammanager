@@ -49,7 +49,7 @@ export function UserMenu({ email, role, teams, hasMultipleClubs }: UserMenuProps
                 {teams.map((t) => (
                   <span
                     key={t.id}
-                    className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                    className="inline-block bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                   >
                     {t.name}
                   </span>

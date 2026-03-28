@@ -1,16 +1,31 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Roboto } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const veneerThree = localFont({
+  src: [
+    {
+      path: "../../public/fonts/VeneerThree.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/VeneerThree.woff",
+      weight: "400",
+      style: "normal",
+    },
+  ],
+  variable: "--font-veneer",
+  display: "swap",
+  fallback: ["Impact", "Arial Black", "sans-serif"],
 });
 
 export const metadata: Metadata = {
@@ -24,9 +39,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="h-full bg-gray-50">
+    <html lang="de" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        className={`${roboto.variable} ${veneerThree.variable} h-full antialiased`}
       >
         {children}
         <Toaster richColors />

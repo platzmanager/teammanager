@@ -119,14 +119,14 @@ export function MembersClient({
     <div className="space-y-6">
       {/* Stats */}
       <div className="flex gap-3">
-        <div className="flex items-center gap-2 rounded-lg border px-4 py-2">
+        <div className="flex items-center gap-2 border px-4 py-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">{members.length} Mitglieder</span>
         </div>
         {unmatchedCount > 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 dark:border-amber-800 dark:bg-amber-950/20">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+          <div className="flex items-center gap-2 border border-golden/30 bg-golden/10 px-4 py-2">
+            <AlertTriangle className="h-4 w-4 text-golden" />
+            <span className="text-sm font-medium text-golden">
               {unmatchedCount} ohne Spieler-Verknüpfung
             </span>
           </div>
@@ -135,7 +135,7 @@ export function MembersClient({
 
       {/* Member list */}
       {members.length > 0 && (
-        <div className="rounded-md border bg-white overflow-x-auto">
+        <div className="border bg-white overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -154,7 +154,7 @@ export function MembersClient({
                   <TableCell className="text-muted-foreground">{m.email ?? "–"}</TableCell>
                   <TableCell>
                     {m.player_uuid ? (
-                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">Verknüpft</span>
+                      <span className="bg-verdigris/10 px-1.5 py-0.5 text-xs text-verdigris">Verknüpft</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">–</span>
                     )}
@@ -180,7 +180,7 @@ export function MembersClient({
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`
-              relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors
+              relative flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed p-6 sm:p-10 transition-colors
               ${dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"}
             `}
           >
@@ -202,7 +202,7 @@ export function MembersClient({
             />
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-4 py-3">
+          <div className="flex items-center gap-3 border bg-muted/50 px-4 py-3">
             <FileSpreadsheet className="h-5 w-5 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fileName}</p>
@@ -224,7 +224,7 @@ export function MembersClient({
                   ({rows.length} Mitglieder)
                 </span>
               </h4>
-              <div className="rounded-md border overflow-x-auto">
+              <div className="border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -267,25 +267,25 @@ export function MembersClient({
         {/* Result */}
         {result && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2.5 rounded-lg border bg-green-50 p-3 dark:bg-green-950/20">
-                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center gap-2.5 border bg-verdigris/10 p-3">
+                <CheckCircle2 className="h-5 w-5 text-verdigris shrink-0" />
                 <div>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{result.count}</p>
-                  <p className="text-xs text-green-600 dark:text-green-500">Importiert</p>
+                  <p className="text-2xl font-bold text-verdigris">{result.count}</p>
+                  <p className="text-xs text-verdigris">Importiert</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-lg border bg-amber-50 p-3 dark:bg-amber-950/20">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+              <div className="flex items-center gap-2.5 border bg-golden/10 p-3">
+                <AlertTriangle className="h-5 w-5 text-golden shrink-0" />
                 <div>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{result.skipped.length}</p>
-                  <p className="text-xs text-amber-600 dark:text-amber-500">Übersprungen</p>
+                  <p className="text-2xl font-bold text-golden">{result.skipped.length}</p>
+                  <p className="text-xs text-golden">Übersprungen</p>
                 </div>
               </div>
             </div>
 
             {result.skipped.length > 0 && (
-              <details className="rounded-lg border">
+              <details className="border">
                 <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-medium hover:bg-muted/50">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   {result.skipped.length} übersprungen

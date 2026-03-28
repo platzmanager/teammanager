@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
+import { MobileNav } from "@/components/mobile-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfile, getUserGenders } from "@/lib/auth";
 import { getUserClubs } from "@/actions/club";
@@ -33,59 +34,72 @@ export default async function ProtectedLayout({
 	const clubSlug = currentClub.slug;
 
 	return (
-		<div className="min-h-screen bg-gray-50">
-			<header className="border-b bg-white">
-				<div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-					<h1 className="text-lg font-bold">{currentClub?.name ?? "Club"}</h1>
-					<div className="flex items-center gap-4">
-						<nav className="flex gap-1">
-							<Link
-								href={`/${clubSlug}/teams`}
-								className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-							>
-								Teams
-							</Link>
-							{genders.length > 0 && (
-								<Link
-									href={`/${clubSlug}/players/${genders[0]}/overview`}
-									className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-								>
-									Meldeliste
-								</Link>
-							)}
-							<Link
-								href={`/${clubSlug}/events`}
-								className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-							>
-								Termine
-							</Link>
-							{isAdmin && (
-								<>
-									<Link
-										href={`/${clubSlug}/admin/members`}
-										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-									>
-										Mitglieder
-									</Link>
-									<Link
-										href={`/${clubSlug}/admin/import`}
-										className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-									>
-										Import
-									</Link>
-								</>
-							)}
-						</nav>
-						<UserMenu
-							email={user.email ?? ""}
-							role={profile?.role ?? "player"}
-							teams={profile?.teams ?? []}
-							hasMultipleClubs={clubs.length > 1}
-						/>
+		<div className="min-h-screen bg-background">
+			<header className="bg-primary text-white relative overflow-hidden">
+				<div className="hidden md:block absolute right-0 top-0 h-full w-48 bg-golden/10 -skew-x-12 translate-x-16" />
+				<div className="hidden md:block absolute right-0 top-0 h-full w-24 bg-sage/10 -skew-x-12 translate-x-32" />
+				<div className="relative mx-auto flex max-w-4xl items-center justify-between px-4 py-3 md:py-4">
+					<div className="flex items-center gap-3">
+						<div className="h-6 w-1.5 bg-golden" />
+						<h1 className="font-display text-xl md:text-2xl tracking-wider">{currentClub?.name ?? "Club"}</h1>
 					</div>
+					<UserMenu
+						email={user.email ?? ""}
+						role={profile?.role ?? "player"}
+						teams={profile?.teams ?? []}
+						hasMultipleClubs={clubs.length > 1}
+					/>
 				</div>
 			</header>
-			<main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+			{/* Desktop nav */}
+			<nav className="hidden md:block border-b border-golden/20 bg-white">
+				<div className="mx-auto flex max-w-4xl gap-0 px-4">
+					<Link
+						href={`/${clubSlug}/teams`}
+						className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+					>
+						Teams
+					</Link>
+					{genders.length > 0 && (
+						<Link
+							href={`/${clubSlug}/players/${genders[0]}/overview`}
+							className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+						>
+							Meldeliste
+						</Link>
+					)}
+					<Link
+						href={`/${clubSlug}/events`}
+						className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+					>
+						Termine
+					</Link>
+					{isAdmin && (
+						<>
+							<Link
+								href={`/${clubSlug}/admin/members`}
+								className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+							>
+								Mitglieder
+							</Link>
+							<Link
+								href={`/${clubSlug}/admin/import`}
+								className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+							>
+								Import
+							</Link>
+						</>
+					)}
+				</div>
+			</nav>
+			<main className="mx-auto max-w-4xl px-4 py-6 pb-20 md:pb-6">{children}</main>
+			{/* Mobile bottom tab bar */}
+			<MobileNav
+				clubSlug={clubSlug}
+				isAdmin={isAdmin}
+				hasPlayers={genders.length > 0}
+				firstGender={genders[0] ?? "male"}
+			/>
 		</div>
 	);
 }

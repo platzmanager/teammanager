@@ -127,9 +127,9 @@ export const RECURRENCE_TYPE_LABELS: Record<RecurrenceType, string> = {
 };
 
 export const RSVP_LABELS: Record<RsvpResponse, string> = {
-  yes: "Zusage",
-  no: "Absage",
-  maybe: "Vielleicht",
+  yes: "Ja",
+  no: "Nein",
+  maybe: "Vllt.",
 };
 
 export interface Member {
@@ -172,7 +172,7 @@ export interface EventOccurrence {
   // Joined fields
   event?: ClubEvent;
   match?: Match;
-  responses?: EventResponse[];
+  responses?: EventResponse[] | { response: RsvpResponse }[];
 }
 
 export interface EventResponse {

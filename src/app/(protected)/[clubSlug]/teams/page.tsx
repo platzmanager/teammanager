@@ -95,13 +95,13 @@ export default function TeamsPage() {
       </div>
 
       {/* Gender filter */}
-      <div className="inline-flex items-center rounded-lg bg-muted p-1">
+      <div className="inline-flex items-center bg-muted p-1">
         {genderFilters.map(({ value, label }) => (
           <button
             key={value}
             onClick={() => setGenderFilter(value)}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              "px-3 py-1.5 text-sm font-medium transition-colors",
               genderFilter === value
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -112,7 +112,7 @@ export default function TeamsPage() {
         ))}
       </div>
 
-      <div className="rounded-md border bg-white">
+      <div className="overflow-x-auto border bg-white">
         <Table>
           <TableHeader>
             <TableRow>
@@ -151,7 +151,7 @@ export default function TeamsPage() {
                       ) : (() => {
                         const available = getTeamAvailableCount(team);
                         return (
-                          <span className={cn(available < team.team_size ? "text-amber-600" : "text-green-600")}>
+                          <span className={cn(available < team.team_size ? "text-golden" : "text-verdigris")}>
                             {available}
                           </span>
                         );

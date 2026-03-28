@@ -1,21 +1,38 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
-import { RsvpResponse, RSVP_LABELS, EventResponse } from "@/lib/types";
+import type { RsvpResponse, EventResponse } from "@/lib/types";
+import { RSVP_LABELS } from "@/lib/types";
 import { respondToEvent } from "@/actions/rsvp";
-import { Loader2 } from "lucide-react";
+import { Check, HelpCircle, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface RsvpButtonsProps {
   occurrenceId: string;
   currentResponse?: EventResponse | null;
 }
 
-const RSVP_STYLES: Record<RsvpResponse, { active: string; inactive: string }> = {
-  yes: { active: "bg-green-600 text-white hover:bg-green-700", inactive: "hover:bg-green-50 hover:text-green-700" },
-  maybe: { active: "bg-yellow-500 text-white hover:bg-yellow-600", inactive: "hover:bg-yellow-50 hover:text-yellow-700" },
-  no: { active: "bg-red-600 text-white hover:bg-red-700", inactive: "hover:bg-red-50 hover:text-red-700" },
+const RSVP_CONFIG: Record<RsvpResponse, {
+  icon: typeof Check;
+  activeBg: string;
+  inactiveBg: string;
+}> = {
+  yes: {
+    icon: Check,
+    activeBg: "bg-verdigris text-white",
+    inactiveBg: "bg-verdigris/25 text-verdigris hover:bg-verdigris/35",
+  },
+  maybe: {
+    icon: HelpCircle,
+    activeBg: "bg-golden text-white",
+    inactiveBg: "bg-golden/25 text-golden hover:bg-golden/35",
+  },
+  no: {
+    icon: X,
+    activeBg: "bg-destructive text-white",
+    inactiveBg: "bg-destructive/25 text-destructive hover:bg-destructive/35",
+  },
 };
 
 export function RsvpButtons({ occurrenceId, currentResponse }: RsvpButtonsProps) {
@@ -35,19 +52,32 @@ export function RsvpButtons({ occurrenceId, currentResponse }: RsvpButtonsProps)
   }
 
   return (
-    <div className="flex gap-1">
-      {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => (
-        <Button
-          key={r}
-          variant="outline"
-          size="sm"
-          disabled={isPending}
-          onClick={() => handleClick(r)}
-          className={`text-xs px-2 py-1 h-7 ${current === r ? RSVP_STYLES[r].active : RSVP_STYLES[r].inactive}`}
-        >
-          {isPending && current === r ? <Loader2 className="h-3 w-3 animate-spin" /> : RSVP_LABELS[r]}
-        </Button>
-      ))}
+    <div className="grid grid-cols-3 gap-1 px-4 pb-3">
+      {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => {
+        const config = RSVP_CONFIG[r];
+        const Icon = config.icon;
+        const isActive = current === r;
+
+        return (
+          <button
+            key={r}
+            type="button"
+            disabled={isPending}
+            onClick={() => handleClick(r)}
+            className={cn(
+              "flex items-center justify-center gap-1.5 py-2 text-xs font-bold uppercase tracking-wide transition-all disabled:opacity-50",
+              isActive ? config.activeBg : config.inactiveBg,
+            )}
+          >
+            {isPending && isActive ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Icon className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">{RSVP_LABELS[r]}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

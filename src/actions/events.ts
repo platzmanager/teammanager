@@ -127,7 +127,7 @@ export async function getTeamEvents(teamId: string) {
   return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase
       .from("event_occurrences")
-      .select("*, event:events!inner(*), match:matches(*)")
+      .select("*, event:events!inner(*), match:matches(*), responses:event_responses(response)")
       .eq("event.club_id", clubId)
       .eq("event.team_id", teamId)
       .gte("start_date", new Date().toISOString().split("T")[0])
@@ -162,7 +162,7 @@ export async function getMemberEvents(memberTeamIds: string[]) {
     // Club-wide events (team_id is null)
     const { data: clubEvents, error: clubError } = await supabase
       .from("event_occurrences")
-      .select("*, event:events!inner(*), match:matches(*)")
+      .select("*, event:events!inner(*), match:matches(*), responses:event_responses(response)")
       .eq("event.club_id", clubId)
       .is("event.team_id", null)
       .gte("start_date", today)
@@ -176,7 +176,7 @@ export async function getMemberEvents(memberTeamIds: string[]) {
     if (memberTeamIds.length > 0) {
       const { data, error } = await supabase
         .from("event_occurrences")
-        .select("*, event:events!inner(*), match:matches(*)")
+        .select("*, event:events!inner(*), match:matches(*), responses:event_responses(response)")
         .eq("event.club_id", clubId)
         .in("event.team_id", memberTeamIds)
         .gte("start_date", today)
@@ -379,7 +379,7 @@ export async function getAllTeamEvents(teamId: string) {
   return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase
       .from("event_occurrences")
-      .select("*, event:events!inner(*), match:matches(*)")
+      .select("*, event:events!inner(*), match:matches(*), responses:event_responses(response)")
       .eq("event.club_id", clubId)
       .eq("event.team_id", teamId)
       .order("start_date")

@@ -13,7 +13,7 @@ export default async function ClubSelectPage() {
 
   if (clubs.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
         <Image src={logo} alt="Matchday.tennis" className="mb-16 h-10 w-auto" priority />
         <div className="text-center">
           <h1 className="text-xl font-bold">Kein Club zugewiesen</h1>
@@ -31,7 +31,7 @@ export default async function ClubSelectPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <Image src={logo} alt="Matchday.tennis" className="mb-16 h-10 w-auto" priority />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
@@ -48,7 +48,7 @@ export default async function ClubSelectPage() {
             }}>
               <button
                 type="submit"
-                className="w-full rounded-lg border bg-white px-4 py-3 text-left font-medium hover:bg-gray-50 transition-colors"
+                className="w-full rounded-lg border bg-white px-4 py-3 text-left font-medium hover:bg-background transition-colors"
               >
                 {club.name}
               </button>

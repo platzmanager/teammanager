@@ -34,9 +34,13 @@ export function EventList({ occurrences, myResponses = {}, showRsvp = true }: Ev
   return (
     <div className="space-y-6">
       {grouped.map((group) => (
-        <div key={group.label} className="space-y-2">
-          <h4 className="text-sm font-semibold text-muted-foreground">{group.label}</h4>
-          <div className="space-y-2">
+        <div key={group.label}>
+          <div className="pb-2 mb-4 border-b border-golden/40">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {group.label}
+            </h4>
+          </div>
+          <div className="space-y-6">
             {group.items.map((occ) => (
               <EventCard
                 key={occ.id}

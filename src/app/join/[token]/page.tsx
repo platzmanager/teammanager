@@ -17,7 +17,7 @@ export default async function JoinPage({
   const club = team.club as { id: string; name: string; slug: string };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">

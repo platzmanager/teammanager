@@ -35,13 +35,13 @@ function TabGroup({ items, gender, current, clubSlug }: {
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="inline-flex items-center rounded-lg bg-muted p-1">
+    <div className="inline-flex items-center bg-muted p-1">
       {items.map((ac) => (
         <Link
           key={ac}
           href={`/${clubSlug}/players/${gender}/${ac}`}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "px-3 py-1.5 text-sm font-medium transition-colors",
             current === ac
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
