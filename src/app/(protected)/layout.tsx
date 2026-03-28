@@ -45,9 +45,12 @@ export default async function ProtectedLayout({
 					</div>
 					<UserMenu
 						email={user.email ?? ""}
+						firstName={profile?.first_name}
+						lastName={profile?.last_name}
 						role={profile?.role ?? "player"}
 						teams={profile?.teams ?? []}
 						hasMultipleClubs={clubs.length > 1}
+						clubSlug={clubSlug}
 					/>
 				</div>
 			</header>

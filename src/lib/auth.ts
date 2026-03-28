@@ -20,6 +20,9 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   return {
     id: data.id,
     role: data.role,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    birth_date: data.birth_date,
     player_uuid: data.player_uuid,
     teams,
     created_at: data.created_at,

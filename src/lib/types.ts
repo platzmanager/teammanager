@@ -101,6 +101,9 @@ export interface Match {
 export interface UserProfile {
   id: string;
   role: UserRole;
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_date?: string | null;
   player_uuid?: string | null;
   teams?: Team[];
   created_at: string;

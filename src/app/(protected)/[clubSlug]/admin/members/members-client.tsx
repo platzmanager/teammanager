@@ -10,13 +10,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, X, CheckCircle2, AlertTriangle, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Upload, FileSpreadsheet, X, CheckCircle2, AlertTriangle, Users, UserPlus, Link2 } from "lucide-react";
 import Papa from "papaparse";
-import { importMembers } from "@/actions/members";
+import { importMembers, linkUserToMember } from "@/actions/members";
+import { toast } from "sonner";
 import { Member } from "@/lib/types";
 
 interface MemberWithTeams extends Member {
   teams: { team: { id: string; name: string } }[];
+}
+
+interface UnlinkedUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  birth_date: string | null;
+  role: string;
 }
 
 interface ImportResult {
@@ -35,17 +51,36 @@ interface ParsedMember {
 export function MembersClient({
   members: initialMembers,
   unmatchedCount,
+  unlinkedUsers: initialUnlinked,
 }: {
   members: MemberWithTeams[];
   unmatchedCount: number;
+  unlinkedUsers: UnlinkedUser[];
 }) {
   const [members] = useState(initialMembers);
+  const [unlinkedUsers, setUnlinkedUsers] = useState(initialUnlinked);
+  const [linkSelections, setLinkSelections] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<ParsedMember[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const unlinkedMembers = members.filter((m) => !m.user_id);
+
+  async function handleLink(userId: string) {
+    const memberId = linkSelections[userId];
+    if (!memberId) return;
+    try {
+      await linkUserToMember(userId, memberId);
+      setUnlinkedUsers((prev) => prev.filter((u) => u.id !== userId));
+      setLinkSelections((prev) => { const next = { ...prev }; delete next[userId]; return next; });
+      toast.success("User verknüpft");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fehler beim Verknüpfen");
+    }
+  }
 
   const processFile = useCallback((file: File) => {
     setFileName(file.name);
@@ -166,6 +201,61 @@ export function MembersClient({
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Unlinked users */}
+      {unlinkedUsers.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-golden" />
+            <h3 className="text-lg font-semibold">Nicht verknüpfte User ({unlinkedUsers.length})</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Diese User haben sich registriert, konnten aber keinem Mitglied zugeordnet werden.
+          </p>
+          <div className="space-y-2">
+            {unlinkedUsers.map((u) => (
+              <div key={u.id} className="flex items-center gap-3 border bg-golden/5 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">
+                    {u.first_name && u.last_name
+                      ? `${u.last_name}, ${u.first_name}`
+                      : "Kein Name hinterlegt"}
+                  </p>
+                  {u.birth_date && (
+                    <p className="text-xs text-muted-foreground">{u.birth_date}</p>
+                  )}
+                </div>
+                <Select
+                  value={linkSelections[u.id] ?? ""}
+                  onValueChange={(v) =>
+                    setLinkSelections((prev) => ({ ...prev, [u.id]: v }))
+                  }
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Mitglied wählen…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unlinkedMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.last_name}, {m.first_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!linkSelections[u.id]}
+                  onClick={() => handleLink(u.id)}
+                >
+                  <Link2 className="mr-1 h-4 w-4" />
+                  Verknüpfen
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

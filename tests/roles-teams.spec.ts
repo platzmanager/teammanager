@@ -104,8 +104,8 @@ test.afterAll(async () => {
 
 test("admin sees Teams and Import links", async ({ page }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/teams"]`)).toBeVisible();
-  await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`)).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/teams"]`).first()).toBeVisible();
+  await expect(page.locator(`a[href="/${CLUB_SLUG}/admin/import"]`).first()).toBeVisible();
 });
 
 test("captain can authenticate", async ({ page }) => {

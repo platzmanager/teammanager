@@ -250,10 +250,23 @@ export async function registerViaInvite(
     try { await admin.auth.admin.deleteUser(userId); } catch { /* ignore */ }
   };
 
-  // Create user profile
+  // Normalize birth_date
+  let birthDate = formData.birth_date;
+  const dotMatch = birthDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (dotMatch) {
+    birthDate = `${dotMatch[3]}-${dotMatch[2].padStart(2, "0")}-${dotMatch[1].padStart(2, "0")}`;
+  }
+
+  // Create user profile with personal data
   const { error: profileError } = await admin
     .from("user_profiles")
-    .insert({ id: userId, role: "player" });
+    .insert({
+      id: userId,
+      role: "player",
+      first_name: formData.first_name.trim(),
+      last_name: formData.last_name.trim(),
+      birth_date: birthDate,
+    });
   if (profileError) { await rollbackAuthUser(); throw new Error("Profil konnte nicht erstellt werden"); }
 
   // Create club membership
@@ -262,56 +275,112 @@ export async function registerViaInvite(
     .upsert({ user_id: userId, club_id: team.club_id }, { onConflict: "user_id,club_id" });
   if (clubError) { await rollbackAuthUser(); throw new Error("Vereins-Zuordnung fehlgeschlagen"); }
 
-  // Normalize birth_date
-  let birthDate = formData.birth_date;
-  const dotMatch = birthDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  if (dotMatch) {
-    birthDate = `${dotMatch[3]}-${dotMatch[2].padStart(2, "0")}-${dotMatch[1].padStart(2, "0")}`;
-  }
-
-  // Auto-match player
-  const { data: matchedPlayer } = await admin
-    .from("players")
-    .select("uuid")
+  // Try to find and link existing member (by email or name+birth_date)
+  const { data: existingMember } = await admin
+    .from("members")
+    .select("id, player_uuid")
     .eq("club_id", team.club_id)
-    .ilike("first_name", formData.first_name.trim())
-    .ilike("last_name", formData.last_name.trim())
-    .eq("birth_date", birthDate)
-    .is("deleted_at", null)
+    .is("user_id", null)
+    .or(`email.ilike.${formData.email},and(first_name.ilike.${formData.first_name.trim()},last_name.ilike.${formData.last_name.trim()},birth_date.eq.${birthDate})`)
+    .limit(1)
     .maybeSingle();
 
-  // Create member record
-  const { data: member, error: memberError } = await admin
-    .from("members")
-    .insert({
-      club_id: team.club_id,
-      user_id: userId,
-      first_name: formData.first_name.trim(),
-      last_name: formData.last_name.trim(),
-      birth_date: birthDate,
-      email: formData.email,
-      player_uuid: matchedPlayer?.uuid ?? null,
-    })
-    .select("id")
-    .single();
-  if (memberError) { await rollbackAuthUser(); throw new Error("Mitglied konnte nicht erstellt werden"); }
+  if (existingMember) {
+    // Link user to existing member
+    await admin
+      .from("members")
+      .update({ user_id: userId })
+      .eq("id", existingMember.id);
 
-  // Create team assignment
-  const { error: assignError } = await admin
-    .from("member_team_assignments")
-    .insert({ member_id: member.id, team_id: team.id });
-  if (assignError) { await rollbackAuthUser(); throw new Error("Team-Zuordnung fehlgeschlagen"); }
+    // Create team assignment
+    await admin
+      .from("member_team_assignments")
+      .upsert({ member_id: existingMember.id, team_id: team.id }, { onConflict: "member_id,team_id" });
+  }
 
   // Log
   await admin.from("event_log").insert({
     event_type: "member_register",
     gender: "male",
-    details: { member_id: member.id, team_id: team.id },
+    details: {
+      member_id: existingMember?.id ?? null,
+      team_id: team.id,
+      linked: !!existingMember,
+    },
     user_id: userId,
     club_id: team.club_id,
   });
 
   return { success: true };
+}
+
+export async function getUnlinkedUsers() {
+  await requireAdmin();
+  return withClubContext(async (supabase, clubId) => {
+    // Get all user_ids already linked to a member in this club
+    const { data: linkedMembers } = await supabase
+      .from("members")
+      .select("user_id")
+      .eq("club_id", clubId)
+      .not("user_id", "is", null);
+
+    const linkedSet = new Set((linkedMembers ?? []).map((m) => m.user_id));
+
+    // Get all users in this club
+    const { data: clubUsers } = await supabase
+      .from("user_clubs")
+      .select("user_id")
+      .eq("club_id", clubId);
+
+    const unlinkedUserIds = (clubUsers ?? [])
+      .map((u) => u.user_id)
+      .filter((id) => !linkedSet.has(id));
+
+    if (unlinkedUserIds.length === 0) return [];
+
+    // Fetch their profiles
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("id, first_name, last_name, birth_date, role")
+      .in("id", unlinkedUserIds);
+
+    return (profiles ?? []).filter((p) => p.role === "player");
+  });
+}
+
+export async function linkUserToMember(userId: string, memberId: string) {
+  await requireAdmin();
+  return withClubContext(async (supabase, clubId) => {
+    // Verify member belongs to this club and has no user_id yet
+    const { data: member } = await supabase
+      .from("members")
+      .select("id, user_id")
+      .eq("id", memberId)
+      .eq("club_id", clubId)
+      .single();
+
+    if (!member) throw new Error("Mitglied nicht gefunden");
+    if (member.user_id) throw new Error("Mitglied ist bereits verknüpft");
+
+    // Verify user belongs to this club
+    const { data: userClub } = await supabase
+      .from("user_clubs")
+      .select("user_id")
+      .eq("user_id", userId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (!userClub) throw new Error("User gehört nicht zu diesem Verein");
+
+    const { error } = await supabase
+      .from("members")
+      .update({ user_id: userId })
+      .eq("id", memberId)
+      .eq("club_id", clubId);
+
+    if (error) throw error;
+    revalidatePath("/", "layout");
+  });
 }
 
 export async function searchPlayers(query: string) {

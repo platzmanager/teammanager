@@ -13,9 +13,12 @@ import { UserRole, Team } from "@/lib/types";
 
 interface UserMenuProps {
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
   role: UserRole;
   teams: Team[];
   hasMultipleClubs?: boolean;
+  clubSlug: string;
 }
 
 const roleLabels: Record<UserRole, string> = {
@@ -24,18 +27,20 @@ const roleLabels: Record<UserRole, string> = {
   player: "Spieler",
 };
 
-export function UserMenu({ email, role, teams, hasMultipleClubs }: UserMenuProps) {
-  const initials = email
-    .split("@")[0]
-    .split(/[._-]/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
+export function UserMenu({ email, firstName, lastName, role, teams, hasMultipleClubs, clubSlug }: UserMenuProps) {
+  const initials = firstName && lastName
+    ? `${firstName[0]}${lastName[0]}`.toUpperCase()
+    : email
+        .split("@")[0]
+        .split(/[._-]/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? "")
+        .join("");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+        <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground ring-2 ring-white/30 hover:ring-white/60 focus:outline-none focus:ring-white/60">
           {initials || "?"}
         </button>
       </DropdownMenuTrigger>
@@ -59,6 +64,11 @@ export function UserMenu({ email, role, teams, hasMultipleClubs }: UserMenuProps
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`/${clubSlug}/profile`} className="w-full">
+            Profil
+          </Link>
+        </DropdownMenuItem>
         {hasMultipleClubs && (
           <DropdownMenuItem asChild>
             <Link href="/club-select" className="w-full">
