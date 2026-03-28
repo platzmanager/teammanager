@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_players_skill_level ON public.players USING btree (skill_level);

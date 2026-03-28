@@ -7,25 +7,42 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
+  const { data: profileData } = await supabase
     .from("user_profiles")
-    .select("*, teams:user_team_assignments(team:teams(*))")
+    .select("*")
     .eq("id", user.id)
     .single();
 
-  if (!data) return null;
+  if (!profileData) return null;
 
-  const teams: Team[] = (data.teams as { team: Team }[] | null)?.map((t) => t.team) ?? [];
+  // Load teams via member record (scoped to current club)
+  const clubId = await getCurrentClubId();
+  let teams: Team[] = [];
+  let captainTeamIds: string[] = [];
+
+  if (clubId) {
+    const { data: memberData } = await supabase
+      .from("members")
+      .select("id, teams:member_team_assignments(role, team:teams(*))")
+      .eq("user_id", user.id)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    const assignments = (memberData?.teams as unknown as { role: string; team: Team }[] | null) ?? [];
+    teams = assignments.map((a) => a.team);
+    captainTeamIds = assignments.filter((a) => a.role === "captain").map((a) => a.team.id);
+  }
 
   return {
-    id: data.id,
-    role: data.role,
-    first_name: data.first_name,
-    last_name: data.last_name,
-    birth_date: data.birth_date,
-    player_uuid: data.player_uuid,
+    id: profileData.id,
+    role: profileData.role,
+    first_name: profileData.first_name,
+    last_name: profileData.last_name,
+    birth_date: profileData.birth_date,
+    player_uuid: profileData.player_uuid,
     teams,
-    created_at: data.created_at,
+    captainTeamIds,
+    created_at: profileData.created_at,
   } as UserProfile;
 }
 

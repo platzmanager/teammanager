@@ -95,11 +95,10 @@ export async function loginAs(page: Page, email: string, password: string) {
 
 export async function createUserProfile(
   userId: string,
-  role: "admin" | "captain" | "player",
-  teamIds?: string | string[],
+  role: "admin" | "user",
+  options?: { clubId?: string; captainTeamIds?: string | string[] },
 ) {
   const body: Record<string, string> = { id: userId, role };
-  const ids = teamIds ? (Array.isArray(teamIds) ? teamIds : [teamIds]) : [];
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
     method: "POST",
     headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
@@ -107,13 +106,28 @@ export async function createUserProfile(
   });
   expect(res.ok).toBeTruthy();
 
-  for (const teamId of ids) {
-    const assignRes = await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments`, {
+  const captainIds = options?.captainTeamIds
+    ? (Array.isArray(options.captainTeamIds) ? options.captainTeamIds : [options.captainTeamIds])
+    : [];
+
+  if (captainIds.length > 0 && options?.clubId) {
+    // Ensure member exists
+    const memberRes = await fetch(`${SUPABASE_URL}/rest/v1/members`, {
       method: "POST",
-      headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
-      body: JSON.stringify({ user_id: userId, team_id: teamId }),
+      headers: { ...serviceHeadersJson(), Prefer: "return=representation,resolution=merge-duplicates" },
+      body: JSON.stringify({ club_id: options.clubId, user_id: userId, first_name: "Test", last_name: "Captain", email: `${userId}@test.local` }),
     });
-    expect(assignRes.ok).toBeTruthy();
+    const memberData = await memberRes.json();
+    const memberId = Array.isArray(memberData) ? memberData[0].id : memberData.id;
+
+    for (const teamId of captainIds) {
+      const assignRes = await fetch(`${SUPABASE_URL}/rest/v1/member_team_assignments`, {
+        method: "POST",
+        headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
+        body: JSON.stringify({ member_id: memberId, team_id: teamId, role: "captain" }),
+      });
+      expect(assignRes.ok).toBeTruthy();
+    }
   }
 }
 

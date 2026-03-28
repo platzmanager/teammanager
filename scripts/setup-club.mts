@@ -204,16 +204,10 @@ async function inviteCaptain(clubId: string, teamId: string): Promise<void> {
   if (!existingProfile) {
     await post(
       "/rest/v1/user_profiles",
-      { id: userId, role: "captain", team_id: teamId },
+      { id: userId, role: "user" },
       "return=minimal",
     );
   }
-
-  // Upsert team assignment (composite PK handles duplicates)
-  await upsert(
-    "/rest/v1/user_team_assignments",
-    { user_id: userId, team_id: teamId },
-  );
 
   // Upsert club membership (composite PK handles duplicates)
   await upsert(
@@ -221,7 +215,29 @@ async function inviteCaptain(clubId: string, teamId: string): Promise<void> {
     { user_id: userId, club_id: clubId },
   );
 
-  console.log("Captain profile, team assignment, and club membership created.");
+  // Find or create member
+  const [existingMember] = await get<{ id: string }[]>(
+    `/rest/v1/members?user_id=eq.${userId}&club_id=eq.${clubId}&select=id`,
+  );
+  let memberId: string;
+  if (existingMember) {
+    memberId = existingMember.id;
+  } else {
+    const newMember = await post<{ id: string }>(
+      "/rest/v1/members",
+      { club_id: clubId, user_id: userId, first_name: "", last_name: "", email },
+      "return=representation",
+    );
+    memberId = newMember.id;
+  }
+
+  // Upsert captain team assignment
+  await upsert(
+    "/rest/v1/member_team_assignments",
+    { member_id: memberId, team_id: teamId, role: "captain" },
+  );
+
+  console.log("Captain profile, member, team assignment, and club membership created.");
 }
 
 async function resortPlayers(clubId: string): Promise<void> {

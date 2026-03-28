@@ -377,8 +377,9 @@ export async function toggleRegistration(
   playerName: string
 ) {
   const profile = await requireRole();
-  if (profile.role === "captain") {
-    const hasScope = profile.teams?.some((t) => t.gender === gender && t.age_class === ageClass);
+  if (profile.role !== "admin") {
+    const captainTeams = (profile.teams ?? []).filter((t) => profile.captainTeamIds.includes(t.id));
+    const hasScope = captainTeams.some((t) => t.gender === gender && t.age_class === ageClass);
     if (!hasScope) {
       throw new Error("Keine Berechtigung für diese Altersklasse");
     }

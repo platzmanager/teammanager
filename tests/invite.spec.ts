@@ -84,7 +84,7 @@ test("invite flow: email → set password → protected page", async ({
   expect(user).toBeTruthy();
   userId = user.id;
 
-  await createUserProfile(userId!, "player");
+  await createUserProfile(userId!, "user");
   await addUserToClub(userId!, clubId);
 
   // 6. Set password

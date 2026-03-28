@@ -295,7 +295,7 @@ export async function registerViaInvite(
     .from("user_profiles")
     .insert({
       id: userId,
-      role: "player",
+      role: "user",
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       birth_date: birthDate,
@@ -308,32 +308,23 @@ export async function registerViaInvite(
     .upsert({ user_id: userId, club_id: team.club_id }, { onConflict: "user_id,club_id" });
   if (clubError) { await rollbackAuthUser(); throw new Error("Vereins-Zuordnung fehlgeschlagen"); }
 
-  // Try to find and link existing member (by email or name+birth_date)
+  // Try to find and link existing member (by name+birth_date, or email if unlinked)
   const { data: existingMember } = await admin
     .from("members")
     .select("id, player_uuid")
     .eq("club_id", team.club_id)
-    .is("user_id", null)
-    .or(`email.ilike.${formData.email},and(first_name.ilike.${formData.first_name.trim()},last_name.ilike.${formData.last_name.trim()},birth_date.eq.${birthDate})`)
+    .or(`and(first_name.ilike.${formData.first_name.trim()},last_name.ilike.${formData.last_name.trim()},birth_date.eq.${birthDate}),and(email.ilike.${formData.email},user_id.is.null)`)
     .limit(1)
     .maybeSingle();
 
   let memberId: string | null = null;
 
   if (existingMember) {
-    // Link user to existing member
+    // Link user to existing member (overwrites old user_id for re-registrations)
     await admin
       .from("members")
       .update({ user_id: userId })
       .eq("id", existingMember.id);
-
-    // Copy player_uuid to user profile if available
-    if (existingMember.player_uuid) {
-      await admin
-        .from("user_profiles")
-        .update({ player_uuid: existingMember.player_uuid })
-        .eq("id", userId);
-    }
 
     // Create team assignment
     await admin
@@ -412,7 +403,7 @@ export async function getUnlinkedUsers() {
       .select("id, first_name, last_name, birth_date, role")
       .in("id", unlinkedUserIds);
 
-    return (profiles ?? []).filter((p) => p.role === "player");
+    return (profiles ?? []).filter((p) => p.role === "user");
   });
 }
 

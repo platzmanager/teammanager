@@ -12,7 +12,7 @@ export async function createEvent(formData: FormData) {
 
     // Only admin or captain of the team can create events
     if (profile.role !== "admin") {
-      if (!teamId || !profile.teams?.some((t) => t.id === teamId)) {
+      if (!teamId || !profile.captainTeamIds.includes(teamId)) {
         throw new Error("Keine Berechtigung");
       }
     }
@@ -78,7 +78,7 @@ export async function updateEvent(id: string, formData: FormData) {
     if (!existing) throw new Error("Termin nicht gefunden");
 
     if (profile.role !== "admin") {
-      if (!existing.team_id || !profile.teams?.some((t) => t.id === existing.team_id)) {
+      if (!existing.team_id || !profile.captainTeamIds.includes(existing.team_id)) {
         throw new Error("Keine Berechtigung");
       }
     }
@@ -112,7 +112,7 @@ export async function deleteEvent(id: string) {
     if (!existing) throw new Error("Termin nicht gefunden");
 
     if (profile.role !== "admin") {
-      if (!existing.team_id || !profile.teams?.some((t) => t.id === existing.team_id)) {
+      if (!existing.team_id || !profile.captainTeamIds.includes(existing.team_id)) {
         throw new Error("Keine Berechtigung");
       }
     }
@@ -212,7 +212,7 @@ export async function cancelOccurrence(id: string) {
 
     if (profile.role !== "admin") {
       const teamId = (occ.event as ClubEvent).team_id;
-      if (!teamId || !profile.teams?.some((t) => t.id === teamId)) {
+      if (!teamId || !profile.captainTeamIds.includes(teamId)) {
         throw new Error("Keine Berechtigung");
       }
     }
@@ -241,7 +241,7 @@ export async function uncancelOccurrence(id: string) {
 
     if (profile.role !== "admin") {
       const teamId = (occ.event as ClubEvent).team_id;
-      if (!teamId || !profile.teams?.some((t) => t.id === teamId)) {
+      if (!teamId || !profile.captainTeamIds.includes(teamId)) {
         throw new Error("Keine Berechtigung");
       }
     }

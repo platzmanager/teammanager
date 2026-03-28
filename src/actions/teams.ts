@@ -148,17 +148,19 @@ export async function deleteTeam(id: string) {
 export async function getTeamCaptains(teamId: string): Promise<{ id: string; email: string }[]> {
   return withClubContext(async (supabase) => {
     const { data, error } = await supabase
-      .from("user_team_assignments")
-      .select("user_id")
-      .eq("team_id", teamId);
+      .from("member_team_assignments")
+      .select("member_id, members!inner(user_id)")
+      .eq("team_id", teamId)
+      .eq("role", "captain");
     if (error) throw error;
     if (!data || data.length === 0) return [];
 
     const admin = createAdminClient();
     const captains = await Promise.all(
-      data.map(async (d: { user_id: string }) => {
-        const { data: { user } } = await admin.auth.admin.getUserById(d.user_id);
-        return { id: d.user_id, email: user?.email ?? d.user_id };
+      data.map(async (d: { members: { user_id: string }[] }) => {
+        const userId = d.members[0].user_id;
+        const { data: { user } } = await admin.auth.admin.getUserById(userId);
+        return { id: userId, email: user?.email ?? userId };
       }),
     );
     return captains;
@@ -167,10 +169,19 @@ export async function getTeamCaptains(teamId: string): Promise<{ id: string; ema
 
 export async function addCaptain(teamId: string, userId: string) {
   await requireAdmin();
-  return withClubContext(async (supabase) => {
+  return withClubContext(async (supabase, clubId) => {
+    // Find member for this user in this club
+    const { data: member } = await supabase
+      .from("members")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+    if (!member) throw new Error("Kein Mitglied gefunden für diesen Benutzer");
+
     const { error } = await supabase
-      .from("user_team_assignments")
-      .insert({ user_id: userId, team_id: teamId });
+      .from("member_team_assignments")
+      .upsert({ member_id: member.id, team_id: teamId, role: "captain" }, { onConflict: "member_id,team_id" });
     if (error) throw error;
   });
 }
@@ -193,7 +204,6 @@ export async function inviteCaptain(teamId: string, email: string): Promise<{ id
       userId = data.user.id;
     }
 
-    // Use admin client for inserts — RLS would block writing rows for another user
     // Upsert user_profiles (don't overwrite existing)
     const { data: existingProfile } = await admin
       .from("user_profiles")
@@ -201,21 +211,57 @@ export async function inviteCaptain(teamId: string, email: string): Promise<{ id
       .eq("id", userId)
       .maybeSingle();
     if (!existingProfile) {
-      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "captain" });
+      const { error: profileError } = await admin.from("user_profiles").insert({ id: userId, role: "user" });
       if (profileError) throw new Error("Profil konnte nicht erstellt werden");
     }
-
-    // Upsert team assignment
-    const { error: assignmentError } = await admin
-      .from("user_team_assignments")
-      .upsert({ user_id: userId, team_id: teamId }, { onConflict: "user_id,team_id" });
-    if (assignmentError) throw new Error("Team-Zuordnung fehlgeschlagen");
 
     // Upsert club membership
     const { error: clubError } = await admin
       .from("user_clubs")
       .upsert({ user_id: userId, club_id: clubId }, { onConflict: "user_id,club_id" });
     if (clubError) throw new Error("Vereins-Zuordnung fehlgeschlagen");
+
+    // Find or create member
+    const { data: existingMember } = await admin
+      .from("members")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    let memberId: string;
+    if (existingMember) {
+      memberId = existingMember.id;
+    } else {
+      // Try to match by email first
+      const { data: emailMatch } = await admin
+        .from("members")
+        .select("id")
+        .eq("club_id", clubId)
+        .ilike("email", email)
+        .is("user_id", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (emailMatch) {
+        await admin.from("members").update({ user_id: userId }).eq("id", emailMatch.id);
+        memberId = emailMatch.id;
+      } else {
+        const { data: newMember, error: memberError } = await admin
+          .from("members")
+          .insert({ club_id: clubId, user_id: userId, first_name: "", last_name: "", email })
+          .select("id")
+          .single();
+        if (memberError) throw new Error("Mitglied konnte nicht erstellt werden");
+        memberId = newMember.id;
+      }
+    }
+
+    // Upsert captain assignment
+    const { error: assignmentError } = await admin
+      .from("member_team_assignments")
+      .upsert({ member_id: memberId, team_id: teamId, role: "captain" }, { onConflict: "member_id,team_id" });
+    if (assignmentError) throw new Error("Team-Zuordnung fehlgeschlagen");
 
     return { id: userId, email };
   });
@@ -353,12 +399,21 @@ export async function getNextMatches(): Promise<Record<string, import("@/lib/typ
 
 export async function removeCaptain(teamId: string, userId: string) {
   await requireAdmin();
-  return withClubContext(async (supabase) => {
-    const { error } = await supabase
-      .from("user_team_assignments")
-      .delete()
+  return withClubContext(async (supabase, clubId) => {
+    const { data: member } = await supabase
+      .from("members")
+      .select("id")
       .eq("user_id", userId)
-      .eq("team_id", teamId);
+      .eq("club_id", clubId)
+      .maybeSingle();
+    if (!member) return;
+
+    const { error } = await supabase
+      .from("member_team_assignments")
+      .delete()
+      .eq("member_id", member.id)
+      .eq("team_id", teamId)
+      .eq("role", "captain");
     if (error) throw error;
   });
 }

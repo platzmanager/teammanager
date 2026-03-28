@@ -23,8 +23,7 @@ interface UserMenuProps {
 
 const roleLabels: Record<UserRole, string> = {
   admin: "Admin",
-  captain: "Mannschaftsführer",
-  player: "Spieler",
+  user: "Mitglied",
 };
 
 export function UserMenu({ email, firstName, lastName, role, teams, hasMultipleClubs, clubSlug }: UserMenuProps) {

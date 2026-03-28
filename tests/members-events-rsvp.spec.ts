@@ -61,7 +61,7 @@ test.beforeAll(async () => {
       { headers: serviceHeaders() }
     );
     for (const t of await teamsRes.json()) {
-      await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments?team_id=eq.${t.id}`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/member_team_assignments?team_id=eq.${t.id}`, {
         method: "DELETE",
         headers: { ...serviceHeaders(), Prefer: "return=minimal" },
       });
@@ -94,7 +94,7 @@ test.beforeAll(async () => {
   teamId = await createTeamViaApi("Herren I", "male", "all", clubId);
 
   captainUserId = await createTestUserWithEmail(CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await createUserProfile(captainUserId, "captain", teamId);
+  await createUserProfile(captainUserId, "user", { clubId, captainTeamIds: teamId });
   await addUserToClub(captainUserId, clubId);
 
   // Create member records for admin and captain so RSVP works

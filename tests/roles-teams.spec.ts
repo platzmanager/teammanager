@@ -44,7 +44,7 @@ test.beforeAll(async () => {
       headers: { apikey: SERVICE_ROLE_KEY },
     });
     for (const t of await teamsRes.json()) {
-      await fetch(`${SUPABASE_URL}/rest/v1/user_team_assignments?team_id=eq.${t.id}`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/member_team_assignments?team_id=eq.${t.id}`, {
         method: "DELETE", headers: { apikey: SERVICE_ROLE_KEY, Prefer: "return=minimal" },
       });
       await fetch(`${SUPABASE_URL}/rest/v1/matches?team_id=eq.${t.id}`, {
@@ -83,7 +83,7 @@ test.beforeAll(async () => {
 
   // Captain assigned to Herren 30
   captainUserId = await createTestUserWithEmail(CAPTAIN_EMAIL, CAPTAIN_PASSWORD);
-  await createUserProfile(captainUserId, "captain", createdTeamIds[1]); // Herren 30 I
+  await createUserProfile(captainUserId, "user", { clubId, captainTeamIds: createdTeamIds[1] }); // Herren 30 I
   await addUserToClub(captainUserId, clubId);
 });
 

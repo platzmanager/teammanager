@@ -27,7 +27,7 @@ export const AGE_CLASS_CONFIG: Record<AgeClass, AgeClassInfo> = {
   u15: { label: "U15", isYouth: true, isMixed: false, maxAge: 15, youthGenderLabels: { male: "Knaben", female: "Mädchen" } },
   u18: { label: "U18", isYouth: true, isMixed: false, maxAge: 18, youthGenderLabels: { male: "Junioren", female: "Juniorinnen" } },
 };
-export type UserRole = "admin" | "captain" | "player";
+export type UserRole = "admin" | "user";
 
 export interface Club {
   id: string;
@@ -106,6 +106,7 @@ export interface UserProfile {
   birth_date?: string | null;
   player_uuid?: string | null;
   teams?: Team[];
+  captainTeamIds: string[];
   created_at: string;
 }
 

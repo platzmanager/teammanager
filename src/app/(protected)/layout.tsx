@@ -47,7 +47,7 @@ export default async function ProtectedLayout({
 						email={user.email ?? ""}
 						firstName={profile?.first_name}
 						lastName={profile?.last_name}
-						role={profile?.role ?? "player"}
+						role={profile?.role ?? "user"}
 						teams={profile?.teams ?? []}
 						hasMultipleClubs={clubs.length > 1}
 						clubSlug={clubSlug}

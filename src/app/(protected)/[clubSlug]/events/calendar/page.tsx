@@ -15,6 +15,7 @@ export default async function CalendarPage({
   const profile = await getUserProfile();
   if (!profile) redirect("/login");
 
+  // profile.teams now includes all teams (captain + player) via member_team_assignments
   const teamIds = (profile.teams ?? []).map((t) => t.id);
   const occurrences = await getMemberEvents(teamIds);
   const occurrenceIds = occurrences.map((o) => o.id);
