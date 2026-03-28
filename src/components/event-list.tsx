@@ -7,6 +7,7 @@ interface EventListProps {
   occurrences: EventOccurrence[];
   myResponses?: Record<string, EventResponse>;
   showRsvp?: boolean;
+  clubSlug?: string;
 }
 
 function getMonthLabel(dateStr: string) {
@@ -14,7 +15,7 @@ function getMonthLabel(dateStr: string) {
   return d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 }
 
-export function EventList({ occurrences, myResponses = {}, showRsvp = true }: EventListProps) {
+export function EventList({ occurrences, myResponses = {}, showRsvp = true, clubSlug }: EventListProps) {
   if (occurrences.length === 0) {
     return <p className="text-sm text-muted-foreground">Keine anstehenden Termine.</p>;
   }
@@ -47,6 +48,7 @@ export function EventList({ occurrences, myResponses = {}, showRsvp = true }: Ev
                 occurrence={occ}
                 myResponse={myResponses[occ.id]}
                 showRsvp={showRsvp}
+                clubSlug={clubSlug}
               />
             ))}
           </div>

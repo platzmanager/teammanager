@@ -375,6 +375,20 @@ export async function createMatchOccurrences(
   return withClubContext(fn);
 }
 
+export async function getOccurrence(occurrenceId: string) {
+  return withClubContext(async (supabase, clubId) => {
+    const { data, error } = await supabase
+      .from("event_occurrences")
+      .select("*, event:events!inner(*), match:matches(*), responses:event_responses(*, member:members(*))")
+      .eq("id", occurrenceId)
+      .eq("event.club_id", clubId)
+      .single();
+
+    if (error) throw error;
+    return data as EventOccurrence;
+  });
+}
+
 export async function getAllTeamEvents(teamId: string) {
   return withClubContext(async (supabase, clubId) => {
     const { data, error } = await supabase

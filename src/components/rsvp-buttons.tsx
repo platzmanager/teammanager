@@ -21,17 +21,17 @@ const RSVP_CONFIG: Record<RsvpResponse, {
   yes: {
     icon: Check,
     activeBg: "bg-verdigris text-white",
-    inactiveBg: "bg-verdigris/25 text-verdigris hover:bg-verdigris/35",
+    inactiveBg: "bg-verdigris/25 text-verdigris hover:bg-verdigris/60 hover:text-white",
   },
   maybe: {
     icon: HelpCircle,
     activeBg: "bg-golden text-white",
-    inactiveBg: "bg-golden/25 text-golden hover:bg-golden/35",
+    inactiveBg: "bg-golden/25 text-golden hover:bg-golden/60 hover:text-white",
   },
   no: {
     icon: X,
     activeBg: "bg-destructive text-white",
-    inactiveBg: "bg-destructive/25 text-destructive hover:bg-destructive/35",
+    inactiveBg: "bg-destructive/25 text-destructive hover:bg-destructive/60 hover:text-white",
   },
 };
 
@@ -52,7 +52,7 @@ export function RsvpButtons({ occurrenceId, currentResponse }: RsvpButtonsProps)
   }
 
   return (
-    <div className="grid grid-cols-3 gap-1 px-4 pb-3">
+    <div className="grid grid-cols-3 gap-1 px-4">
       {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => {
         const config = RSVP_CONFIG[r];
         const Icon = config.icon;

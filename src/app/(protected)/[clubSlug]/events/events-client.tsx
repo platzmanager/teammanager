@@ -36,7 +36,7 @@ export function EventsClient({ occurrences, myResponses, isAdminOrCaptain, clubS
         </div>
       </div>
 
-      <EventList occurrences={occurrences} myResponses={myResponses} />
+      <EventList occurrences={occurrences} myResponses={myResponses} clubSlug={clubSlug} />
 
       {isAdminOrCaptain && (
         <EventForm open={formOpen} onOpenChange={setFormOpen} teamId={teamIds.length === 1 ? teamIds[0] : null} />

@@ -160,7 +160,7 @@ export function TeamDetailClient({ team, captains: initialCaptains, players, blo
             )}
           </div>
           {eventOccurrences.length > 0 ? (
-            <EventList occurrences={eventOccurrences} myResponses={myResponses} />
+            <EventList occurrences={eventOccurrences} myResponses={myResponses} clubSlug={clubSlug} />
           ) : matches.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Termine geplant.</p>
           ) : (
