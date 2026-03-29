@@ -193,3 +193,13 @@ export interface EventResponse {
   // Joined
   member?: Member;
 }
+
+export interface MatchLineup {
+  id: string;
+  match_id: string;
+  player_uuid: string;
+  created_by: string;
+  created_at: string;
+  // Joined
+  player?: Player;
+}

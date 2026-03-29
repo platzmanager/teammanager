@@ -1,9 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { getUserProfile } from "@/lib/auth";
 import { getOccurrence } from "@/actions/events";
+import { getLineup, getSeasonMatchCounts } from "@/actions/lineup";
 import { getMyResponses } from "@/actions/rsvp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sortPlayers } from "@/lib/players";
+import type { Player } from "@/lib/types";
 import { EventDetailClient, type TeamMemberWithSort } from "./event-detail-client";
 
 async function getTeamRoster(teamId: string): Promise<TeamMemberWithSort[]> {
@@ -69,6 +71,30 @@ async function getTeamRoster(teamId: string): Promise<TeamMemberWithSort[]> {
   }).sort((a, b) => a.sortIndex - b.sortIndex);
 }
 
+async function getTeamPlayers(teamId: string, clubId: string): Promise<Player[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("players")
+    .select("*")
+    .eq("club_id", clubId)
+    .is("deleted_at", null);
+
+  if (error || !data) return [];
+
+  // Filter to players that are in the team roster (via member_team_assignments)
+  const { data: assignments } = await admin
+    .from("member_team_assignments")
+    .select("member_id, members!inner(player_uuid)")
+    .eq("team_id", teamId);
+
+  const rosterUuids = new Set(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (assignments ?? []).map((a: any) => a.members?.player_uuid).filter(Boolean)
+  );
+
+  return sortPlayers(data.filter((p) => rosterUuids.has(p.uuid)));
+}
+
 export default async function EventDetailPage({
   params,
 }: {
@@ -90,13 +116,30 @@ export default async function EventDetailPage({
 
   // Load team roster for sorting and non-responder display
   const teamId = occurrence.event?.team_id;
+  const matchId = occurrence.match_id;
   const teamMembers = teamId ? await getTeamRoster(teamId) : [];
+
+  // Lineup data (only for match events)
+  const isMatch = occurrence.event?.event_type === "match" && matchId;
+  const isCaptain = profile.role === "admin" || (teamId ? profile.captainTeamIds.includes(teamId) : false);
+
+  const [lineup, matchCounts, teamPlayers] = isMatch && teamId
+    ? await Promise.all([
+        getLineup(matchId),
+        getSeasonMatchCounts(teamId),
+        getTeamPlayers(teamId, occurrence.event!.club_id),
+      ])
+    : [[], {}, []];
 
   return (
     <EventDetailClient
       occurrence={occurrence}
       myResponse={myResponses[occurrenceId] ?? null}
       teamMembers={teamMembers}
+      lineup={lineup}
+      matchCounts={matchCounts}
+      teamPlayers={teamPlayers}
+      isCaptain={isCaptain}
     />
   );
 }
