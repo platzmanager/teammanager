@@ -1,10 +1,10 @@
 import { redirect, notFound } from "next/navigation";
-import { getUserProfile } from "@/lib/auth";
 import { getOccurrence } from "@/actions/events";
 import { getLineup, getSeasonMatchCounts } from "@/actions/lineup";
 import { getMyResponses } from "@/actions/rsvp";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUserProfile } from "@/lib/auth";
 import { sortPlayers } from "@/lib/players";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Player } from "@/lib/types";
 import { EventDetailClient, type TeamMemberWithSort } from "./event-detail-client";
 
@@ -73,26 +73,29 @@ async function getTeamRoster(teamId: string): Promise<TeamMemberWithSort[]> {
 
 async function getTeamPlayers(teamId: string, clubId: string): Promise<Player[]> {
   const admin = createAdminClient();
-  const { data, error } = await admin
+
+  // Single query: get player_uuids assigned to this team
+  const { data: assignments } = await admin
+    .from("member_team_assignments")
+    .select("members!inner(player_uuid)")
+    .eq("team_id", teamId);
+
+  const rosterUuids = (assignments ?? [])
+    .map((a) => (a.members as unknown as { player_uuid: string | null })?.player_uuid)
+    .filter(Boolean) as string[];
+
+  if (rosterUuids.length === 0) return [];
+
+  const { data: players, error } = await admin
     .from("players")
     .select("*")
     .eq("club_id", clubId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .in("uuid", rosterUuids);
 
-  if (error || !data) return [];
+  if (error || !players) return [];
 
-  // Filter to players that are in the team roster (via member_team_assignments)
-  const { data: assignments } = await admin
-    .from("member_team_assignments")
-    .select("member_id, members!inner(player_uuid)")
-    .eq("team_id", teamId);
-
-  const rosterUuids = new Set(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (assignments ?? []).map((a: any) => a.members?.player_uuid).filter(Boolean)
-  );
-
-  return sortPlayers(data.filter((p) => rosterUuids.has(p.uuid)));
+  return sortPlayers(players);
 }
 
 export default async function EventDetailPage({

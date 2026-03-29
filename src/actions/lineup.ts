@@ -1,9 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { withClubContext } from "@/lib/club";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { revalidatePath } from "next/cache";
 import { getUser } from "@/lib/supabase/server";
 import type { MatchLineup } from "@/lib/types";
 
@@ -41,31 +41,15 @@ export async function updateLineup(matchId: string, playerUuids: string[]) {
       }
     }
 
-    // Use admin client to bypass RLS for delete+insert atomicity
+    // Atomic replace via RPC — delete + insert in a single transaction
     const admin = createAdminClient();
+    const { error } = await admin.rpc("replace_match_lineup", {
+      p_match_id: matchId,
+      p_player_uuids: playerUuids,
+      p_created_by: user.id,
+    });
 
-    // Delete existing lineup
-    const { error: deleteError } = await admin
-      .from("match_lineups")
-      .delete()
-      .eq("match_id", matchId);
-
-    if (deleteError) throw deleteError;
-
-    // Insert new lineup
-    if (playerUuids.length > 0) {
-      const rows = playerUuids.map((uuid) => ({
-        match_id: matchId,
-        player_uuid: uuid,
-        created_by: user.id,
-      }));
-
-      const { error: insertError } = await admin
-        .from("match_lineups")
-        .insert(rows);
-
-      if (insertError) throw insertError;
-    }
+    if (error) throw error;
 
     revalidatePath("/", "layout");
   });
@@ -74,21 +58,25 @@ export async function updateLineup(matchId: string, playerUuids: string[]) {
 export async function getSeasonMatchCounts(
   teamId: string
 ): Promise<Record<string, number>> {
-  const admin = createAdminClient();
+  await requireRole();
 
-  const seasonStart = `${new Date().getFullYear()}-01-01`;
+  return withClubContext(async () => {
+    const seasonStart = `${new Date().getFullYear()}-01-01`;
 
-  const { data, error } = await admin
-    .from("match_lineups")
-    .select("player_uuid, matches!inner(team_id, match_date)")
-    .eq("matches.team_id", teamId)
-    .gte("matches.match_date", seasonStart);
+    // Use admin client for the cross-table join query
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("match_lineups")
+      .select("player_uuid, matches!inner(team_id, match_date)")
+      .eq("matches.team_id", teamId)
+      .gte("matches.match_date", seasonStart);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  const counts: Record<string, number> = {};
-  for (const row of data ?? []) {
-    counts[row.player_uuid] = (counts[row.player_uuid] ?? 0) + 1;
-  }
-  return counts;
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counts[row.player_uuid] = (counts[row.player_uuid] ?? 0) + 1;
+    }
+    return counts;
+  });
 }
