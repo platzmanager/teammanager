@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getTeamByInviteToken } from "@/actions/members";
+import { getUser } from "@/lib/supabase/server";
 import { JoinForm } from "./join-form";
 
 export default async function JoinPage({
@@ -18,8 +18,7 @@ export default async function JoinPage({
   const club = team.club as { id: string; name: string; slug: string };
 
   // Check if user is already logged in
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUser();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

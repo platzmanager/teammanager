@@ -1,14 +1,10 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getUserProfile, requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { withClubContext } from "@/lib/club";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AgeClass, Gender, Team, UserProfile } from "@/lib/types";
-
-export async function getSessionProfile(): Promise<UserProfile | null> {
-	return getUserProfile();
-}
+import type { AgeClass, Gender, Team } from "@/lib/types";
 
 export async function getTeams() {
 	return withClubContext(async (supabase, clubId) => {

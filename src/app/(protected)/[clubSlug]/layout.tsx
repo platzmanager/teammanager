@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { getCurrentClubId } from "@/lib/club";
 
 export default async function ClubSlugLayout({
@@ -28,7 +28,7 @@ export default async function ClubSlugLayout({
 	// Sync cookie if URL slug doesn't match current cookie
 	if (club.id !== currentClubId) {
 		// Verify user has access to this club
-		const { data: { user } } = await supabase.auth.getUser();
+		const user = await getUser();
 		if (!user) redirect("/login");
 
 		const { data: membership } = await supabase
