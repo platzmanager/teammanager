@@ -25,25 +25,25 @@ interface RsvpButtonsProps {
 const RSVP_CONFIG: Record<RsvpResponse, {
   icon: typeof Check;
   activeBg: string;
-  activeRing: string;
+  activeBorder: string;
   inactiveBg: string;
 }> = {
   yes: {
     icon: Check,
     activeBg: "bg-verdigris text-white",
-    activeRing: "ring-2 ring-offset-2 ring-verdigris",
+    activeBorder: "shadow-[inset_0_0_0_3px_oklch(0.62_0.13_192)]",
     inactiveBg: "bg-verdigris/15 text-verdigris/70 hover:bg-verdigris/80 hover:text-white",
   },
   maybe: {
     icon: HelpCircle,
     activeBg: "bg-golden text-white",
-    activeRing: "ring-2 ring-offset-2 ring-golden",
+    activeBorder: "shadow-[inset_0_0_0_3px_oklch(0.83_0.14_85)]",
     inactiveBg: "bg-golden/15 text-golden/70 hover:bg-golden/80 hover:text-white",
   },
   no: {
     icon: X,
     activeBg: "bg-destructive text-white",
-    activeRing: "ring-2 ring-offset-2 ring-destructive",
+    activeBorder: "shadow-[inset_0_0_0_3px_oklch(0.55_0.20_28)]",
     inactiveBg: "bg-destructive/15 text-destructive/70 hover:bg-destructive/80 hover:text-white",
   },
 };
@@ -80,7 +80,7 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
   const isSmall = size === "sm";
 
   return (
-    <div className={cn("grid grid-cols-3 -m-1 p-1", isSmall ? "gap-1" : "gap-2")}>
+    <div className={cn("grid grid-cols-3", isSmall ? "gap-1" : "gap-2")}>
       {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => {
         const config = RSVP_CONFIG[r];
         const Icon = config.icon;
@@ -96,7 +96,7 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
               "flex items-center justify-center font-bold uppercase tracking-wide transition-all disabled:opacity-50",
               isSmall ? "gap-1.5 py-2 text-xs" : "gap-2 py-3 text-sm",
               isActive
-                ? cn(config.activeBg, config.activeRing)
+                ? cn(config.activeBg, config.activeBorder)
                 : config.inactiveBg,
             )}
           >
