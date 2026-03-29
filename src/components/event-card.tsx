@@ -185,7 +185,7 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
           {/* Row 3: RSVP buttons (not inside link) */}
           {showRsvp && !occurrence.cancelled && (
             <div className="mt-auto pl-4 pt-4">
-              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} counts={rsvpCounts} onChange={setOptimisticResponse} />
+              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} counts={rsvpCounts} onChange={setOptimisticResponse} size="sm" />
             </div>
           )}
         </div>

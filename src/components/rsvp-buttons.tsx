@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, X } from "lucide-react";
+import { Check, HelpCircle, Loader2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { respondToEvent } from "@/actions/rsvp";
@@ -19,31 +19,36 @@ interface RsvpButtonsProps {
   currentResponse?: EventResponse | null;
   counts?: RsvpCounts;
   onChange?: (response: RsvpResponse) => void;
+  size?: "sm" | "default";
 }
 
 const RSVP_CONFIG: Record<RsvpResponse, {
-  icon: typeof Check | null;
+  icon: typeof Check;
   activeBg: string;
+  activeRing: string;
   inactiveBg: string;
 }> = {
   yes: {
     icon: Check,
     activeBg: "bg-verdigris text-white",
+    activeRing: "ring-2 ring-offset-2 ring-verdigris",
     inactiveBg: "bg-verdigris/15 text-verdigris/70 hover:bg-verdigris/80 hover:text-white",
   },
   maybe: {
-    icon: null,
+    icon: HelpCircle,
     activeBg: "bg-golden text-white",
+    activeRing: "ring-2 ring-offset-2 ring-golden",
     inactiveBg: "bg-golden/15 text-golden/70 hover:bg-golden/80 hover:text-white",
   },
   no: {
     icon: X,
     activeBg: "bg-destructive text-white",
+    activeRing: "ring-2 ring-offset-2 ring-destructive",
     inactiveBg: "bg-destructive/15 text-destructive/70 hover:bg-destructive/80 hover:text-white",
   },
 };
 
-export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange }: RsvpButtonsProps) {
+export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, size = "default" }: RsvpButtonsProps) {
   const [current, setCurrent] = useState<RsvpResponse | null>(currentResponse?.response ?? null);
   const [optimisticCounts, setOptimisticCounts] = useState<RsvpCounts | undefined>(counts);
   const [isPending, startTransition] = useTransition();
@@ -72,8 +77,10 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange }:
     });
   }
 
+  const isSmall = size === "sm";
+
   return (
-    <div className="grid grid-cols-3 gap-1">
+    <div className={cn("grid grid-cols-3", isSmall ? "gap-1" : "gap-2")}>
       {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => {
         const config = RSVP_CONFIG[r];
         const Icon = config.icon;
@@ -86,18 +93,19 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange }:
             disabled={isPending}
             onClick={() => handleClick(r)}
             className={cn(
-              "flex items-center justify-center gap-1.5 py-2 text-xs font-bold uppercase tracking-wide transition-all disabled:opacity-50",
-              isActive ? config.activeBg : config.inactiveBg,
+              "flex items-center justify-center font-bold uppercase tracking-wide transition-all disabled:opacity-50",
+              isSmall ? "gap-1.5 py-2 text-xs" : "gap-2 py-3 text-sm",
+              isActive
+                ? cn(config.activeBg, !isSmall && config.activeRing)
+                : config.inactiveBg,
             )}
           >
             {isPending && isActive ? (
               <Loader2 className="h-4 w-4 animate-spin" />
-            ) : Icon ? (
-              <Icon className="h-4 w-4" />
             ) : (
-              <span className="text-sm font-bold leading-none">?</span>
+              <Icon className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline">{RSVP_LABELS[r]}</span>
+            <span className={isSmall ? "hidden sm:inline" : ""}>{RSVP_LABELS[r]}</span>
             {optimisticCounts != null && (
               <span className="tabular-nums">({optimisticCounts[r]})</span>
             )}
