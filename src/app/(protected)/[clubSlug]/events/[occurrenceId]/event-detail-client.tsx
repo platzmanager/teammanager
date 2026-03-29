@@ -1,18 +1,25 @@
 "use client";
 
+import { ArrowLeft, Check, Clock as ClockIcon, Globe, HelpCircle, Home, MapPin, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { Label, Pie, PieChart } from "recharts";
+import { RsvpButtons } from "@/components/rsvp-buttons";
 import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
 import { EVENT_TYPE_LABELS } from "@/lib/types";
-import { Home, MapPin, Globe, Check, HelpCircle, X, ArrowLeft, Calendar, Clock } from "lucide-react";
-import { RsvpButtons } from "@/components/rsvp-buttons";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+
+export interface TeamMemberWithSort {
+  id: string;
+  first_name: string;
+  last_name: string;
+  player_uuid: string | null;
+  sortIndex: number;
+}
 
 interface EventDetailClientProps {
   occurrence: EventOccurrence;
   myResponse: EventResponse | null;
+  teamMembers?: TeamMemberWithSort[];
 }
 
 function formatFullDate(iso: string) {
@@ -22,6 +29,18 @@ function formatFullDate(iso: string) {
     month: "long",
     year: "numeric",
   });
+}
+
+function formatDay(iso: string) {
+  return new Date(`${iso}T00:00:00`).getDate().toString();
+}
+
+function formatWeekdayShort(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "").toUpperCase();
+}
+
+function formatMonthShort(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("de-DE", { month: "short" }).replace(".", "").toUpperCase();
 }
 
 function formatTime(t: string | null) {
@@ -46,6 +65,15 @@ function getCountdownColor(c: string): string {
   return "bg-sage text-white";
 }
 
+function getDateBlockColor(response?: string | null): string {
+  switch (response) {
+    case "yes": return "bg-verdigris";
+    case "maybe": return "bg-golden";
+    case "no": return "bg-destructive";
+    default: return "bg-[#D4B483]";
+  }
+}
+
 function groupResponsesByStatus(responses: EventResponse[]) {
   const groups: Record<RsvpResponse, EventResponse[]> = { yes: [], maybe: [], no: [] };
   for (const r of responses) {
@@ -56,13 +84,17 @@ function groupResponsesByStatus(responses: EventResponse[]) {
   return groups;
 }
 
-const RESPONSE_CONFIG: Record<RsvpResponse, { label: string; icon: typeof Check; color: string }> = {
-  yes: { label: "Zusagen", icon: Check, color: "text-verdigris" },
-  maybe: { label: "Vielleicht", icon: HelpCircle, color: "text-golden" },
-  no: { label: "Absagen", icon: X, color: "text-destructive" },
+function getInitials(first: string, last: string): string {
+  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+}
+
+const RESPONSE_CONFIG: Record<RsvpResponse, { label: string; icon: typeof Check; color: string; bg: string }> = {
+  yes: { label: "Zusagen", icon: Check, color: "text-verdigris", bg: "bg-verdigris" },
+  maybe: { label: "Vielleicht", icon: HelpCircle, color: "text-golden", bg: "bg-golden" },
+  no: { label: "Absagen", icon: X, color: "text-destructive", bg: "bg-destructive" },
 };
 
-export function EventDetailClient({ occurrence, myResponse }: EventDetailClientProps) {
+export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: EventDetailClientProps) {
   const router = useRouter();
   const event = occurrence.event;
   const match = occurrence.match;
@@ -76,239 +108,277 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
   const teamName = event?.team?.name;
   const currentResponse = myResponse?.response ?? null;
 
+  // Build a sort map from teamMembers for ordering responses
+  const memberSortMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const tm of teamMembers) {
+      map.set(tm.id, tm.sortIndex);
+    }
+    return map;
+  }, [teamMembers]);
+
+  // Sort responses within each group by Meldeliste position
+  const sortedGrouped = useMemo(() => {
+    const result: Record<RsvpResponse, EventResponse[]> = { yes: [], maybe: [], no: [] };
+    for (const status of ["yes", "maybe", "no"] as RsvpResponse[]) {
+      result[status] = [...grouped[status]].sort((a, b) => {
+        const aSort = memberSortMap.get(a.member_id) ?? 9999;
+        const bSort = memberSortMap.get(b.member_id) ?? 9999;
+        return aSort - bSort;
+      });
+    }
+    return result;
+  }, [grouped, memberSortMap]);
+
+  // Find team members who haven't responded
+  const nonResponders = useMemo(() => {
+    const respondedMemberIds = new Set(responses.map((r) => r.member_id));
+    return teamMembers.filter((tm) => !respondedMemberIds.has(tm.id));
+  }, [teamMembers, responses]);
+
+  // RSVP badge
   const rsvpBadge = currentResponse ? (() => {
-    const RsvpIcon = currentResponse === "yes" ? Check : currentResponse === "no" ? X : null;
+    const RsvpIcon = currentResponse === "yes" ? Check : currentResponse === "no" ? X : HelpCircle;
     const rsvpColor = currentResponse === "yes" ? "bg-verdigris/15 text-verdigris" : currentResponse === "maybe" ? "bg-golden/15 text-golden" : "bg-destructive/15 text-destructive";
     const rsvpLabel = currentResponse === "yes" ? "Dabei" : currentResponse === "maybe" ? "Unsicher" : "Nicht dabei";
     return (
-      <span className={cn("ml-auto flex items-center gap-1 px-1.5 text-xs font-bold uppercase shrink-0", rsvpColor)}>
-        {RsvpIcon ? <RsvpIcon className="h-3.5 w-3.5" /> : <span className="text-xs font-bold">?</span>}
+      <span className={cn("flex items-center gap-1 px-2 py-0.5 text-xs font-bold uppercase shrink-0", rsvpColor)}>
+        <RsvpIcon className="h-3.5 w-3.5" />
         {rsvpLabel}
       </span>
     );
   })() : null;
 
+  // Hero accent colors based on home/away
+  const heroAccent = isMatch
+    ? match.is_home
+      ? { border: "border-l-verdigris", bg: "bg-verdigris/5" }
+      : { border: "border-l-cerulean", bg: "bg-cerulean/5" }
+    : { border: "border-l-sage", bg: "bg-sage/5" };
+
+  const hasParticipants = responses.length > 0 || nonResponders.length > 0;
+
+  const participantsList = hasParticipants && (
+    <div className="space-y-3">
+      {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
+        const items = sortedGrouped[status];
+        if (items.length === 0) return null;
+        const config = RESPONSE_CONFIG[status];
+        const Icon = config.icon;
+
+        return (
+          <div key={status} className="border border-border">
+            <div className={cn("flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30", config.color)}>
+              <Icon className="h-4 w-4" />
+              <span>{config.label} ({items.length})</span>
+            </div>
+            {items.map((r, i) => (
+              <div key={r.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < items.length - 1 && "border-b border-border")}>
+                <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold text-white", config.bg)}>
+                  {getInitials(r.member?.first_name ?? "", r.member?.last_name ?? "")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm">{r.member?.first_name} {r.member?.last_name}</span>
+                  {r.comment && (
+                    <p className="text-xs text-muted-foreground italic mt-0.5">{r.comment}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      {nonResponders.length > 0 && (
+        <div className="border border-border">
+          <div className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30 text-muted-foreground">
+            <ClockIcon className="h-4 w-4" />
+            <span>Ausstehend ({nonResponders.length})</span>
+          </div>
+          {nonResponders.map((m, i) => (
+            <div key={m.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-muted-foreground", i < nonResponders.length - 1 && "border-b border-border")}>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold bg-muted text-muted-foreground">
+                {getInitials(m.first_name, m.last_name)}
+              </div>
+              <span className="text-sm">{m.first_name} {m.last_name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div>
       {/* Back button */}
       <button
         type="button"
         onClick={() => router.back()}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück
       </button>
 
-      {/* Team context */}
-      {teamName && (
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{teamName}</p>
-      )}
-
-      {/* Header */}
-      <div>
-        {isMatch ? (
-          <>
-            <h1 className="text-2xl font-bold">{opponent}</h1>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="flex items-center gap-1 text-sm font-bold uppercase text-muted-foreground">
-                {match.is_home ? <Home className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
-                {match.is_home ? "Heimspiel" : "Auswärtsspiel"}
-              </span>
-              {countdown && (
-                <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
-                  {countdown}
-                </span>
-              )}
-              {rsvpBadge}
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-bold">{event?.title}</h1>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-sm font-bold uppercase text-sage">
-                {event && EVENT_TYPE_LABELS[event.event_type]}
-              </span>
-              {countdown && (
-                <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
-                  {countdown}
-                </span>
-              )}
-              {rsvpBadge}
-            </div>
-          </>
-        )}
-
-        {occurrence.cancelled && (
-          <span className="mt-2 inline-block bg-destructive text-white px-2 py-0.5 text-xs font-bold uppercase">
-            Abgesagt
-          </span>
-        )}
-      </div>
-
-      {/* Details */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span>{formatFullDate(occurrence.start_date)}</span>
-        </div>
-        {time && (
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{time}</span>
-          </div>
-        )}
-        {location && (
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(location)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-cerulean hover:text-cerulean/70 transition-colors"
-          >
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span className="underline-offset-2 hover:underline">{location}</span>
-          </a>
-        )}
-        {!isMatch && event?.description && (
-          <p className="text-sm text-muted-foreground">{event.description}</p>
-        )}
-      </div>
-
-      {/* RSVP */}
-      {!occurrence.cancelled && (
+      {/* Desktop: two-column layout — Left: info + RSVP, Right: participants */}
+      <div className="lg:grid lg:grid-cols-[1fr,1fr] lg:gap-8 lg:items-start">
+        {/* Left column */}
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Rückmeldung</h2>
-          <div className="max-w-sm">
-            <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
+          {/* Hero Header */}
+          <div className={cn("border-l-4 -mx-4 px-4 py-5 lg:mx-0", heroAccent.border, heroAccent.bg)}>
+            {teamName && (
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{teamName}</p>
+            )}
+
+            {isMatch ? (
+              <>
+                <h1 className="font-display text-3xl">{opponent}</h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1 text-sm font-bold uppercase text-muted-foreground">
+                    {match.is_home ? <Home className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
+                    {match.is_home ? "Heimspiel" : "Auswärtsspiel"}
+                  </span>
+                  {countdown && (
+                    <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
+                      {countdown}
+                    </span>
+                  )}
+                  {rsvpBadge}
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-3xl">{event?.title}</h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold uppercase text-sage">
+                    {event && EVENT_TYPE_LABELS[event.event_type]}
+                  </span>
+                  {countdown && (
+                    <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
+                      {countdown}
+                    </span>
+                  )}
+                  {rsvpBadge}
+                </div>
+              </>
+            )}
+
+            {occurrence.cancelled && (
+              <span className="mt-3 inline-block bg-destructive text-white px-2 py-0.5 text-xs font-bold uppercase">
+                Abgesagt
+              </span>
+            )}
           </div>
+
+          {/* Date/Time/Location Block */}
+          <div className="mt-6 flex border border-border overflow-hidden">
+            <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center py-3 text-white", getDateBlockColor(currentResponse))}>
+              <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
+                {formatWeekdayShort(occurrence.start_date)}
+              </span>
+              <span className="font-display text-4xl leading-none">
+                {formatDay(occurrence.start_date)}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
+                {formatMonthShort(occurrence.start_date)}
+              </span>
+            </div>
+            <div className="flex-1 flex flex-col justify-center gap-1 px-4 py-3">
+              <span className="text-sm text-muted-foreground">{formatFullDate(occurrence.start_date)}</span>
+              {time && (
+                <span className="text-lg font-bold">{time}</span>
+              )}
+              {location && (
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-cerulean hover:text-cerulean/70 transition-colors"
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="underline-offset-2 hover:underline">{location}</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Description (non-match events) */}
+          {!isMatch && event?.description && (
+            <p className="mt-4 text-sm text-muted-foreground">{event.description}</p>
+          )}
+
+          {/* RSVP Buttons */}
+          {!occurrence.cancelled && (
+            <div className="mt-8">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Rückmeldung</h2>
+              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
+            </div>
+          )}
+
+          {/* RSVP Summary Bar */}
+          {responses.length > 0 && (
+            <RsvpSummaryBar grouped={grouped} />
+          )}
         </div>
-      )}
 
-      {/* RSVP Chart */}
-      {responses.length > 0 && <RsvpChart grouped={grouped} />}
+        {/* Right column: Participants (desktop) */}
+        {hasParticipants && (
+          <div className="hidden lg:block">
+            {participantsList}
+          </div>
+        )}
+      </div>
 
-      {/* Responses list */}
-      {responses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Teilnehmer</h2>
-          {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
-            const items = grouped[status];
-            if (items.length === 0) return null;
-            const config = RESPONSE_CONFIG[status];
-            const Icon = config.icon;
-
-            return (
-              <div key={status}>
-                <div className={cn("flex items-center gap-1.5 text-sm font-bold mb-2", config.color)}>
-                  <Icon className="h-4 w-4" />
-                  <span>{config.label} ({items.length})</span>
-                </div>
-                <div className="space-y-1 pl-6">
-                  {items.map((r) => (
-                    <div key={r.id} className="text-sm">
-                      <span>{r.member?.first_name} {r.member?.last_name}</span>
-                      {r.comment && (
-                        <span className="text-muted-foreground ml-2">– {r.comment}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {/* Participants (mobile — below everything) */}
+      {hasParticipants && (
+        <div className="mt-8 border-t border-border pt-6 lg:hidden">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Teilnehmer</h2>
+          {participantsList}
         </div>
       )}
     </div>
   );
 }
 
-const rsvpChartConfig = {
-  count: { label: "Antworten" },
-  yes: { label: "Dabei", color: "var(--color-verdigris)" },
-  maybe: { label: "Unsicher", color: "var(--color-golden)" },
-  no: { label: "Nicht dabei", color: "var(--color-destructive)" },
-} satisfies ChartConfig;
-
-function RsvpChart({ grouped }: { grouped: Record<RsvpResponse, EventResponse[]> }) {
-  const chartData = useMemo(() => [
-    { status: "yes", count: grouped.yes.length, fill: "var(--color-yes)" },
-    { status: "maybe", count: grouped.maybe.length, fill: "var(--color-maybe)" },
-    { status: "no", count: grouped.no.length, fill: "var(--color-no)" },
-  ].filter((d) => d.count > 0), [grouped]);
-
-  const total = useMemo(() => chartData.reduce((acc, d) => acc + d.count, 0), [chartData]);
+function RsvpSummaryBar({ grouped }: { grouped: Record<RsvpResponse, EventResponse[]> }) {
+  const yes = grouped.yes.length;
+  const maybe = grouped.maybe.length;
+  const no = grouped.no.length;
+  const total = yes + maybe + no;
 
   if (total === 0) return null;
 
+  const yesPct = (yes / total) * 100;
+  const maybePct = (maybe / total) * 100;
+  const noPct = (no / total) * 100;
+
   return (
-    <div>
-      <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Übersicht</h2>
-      <ChartContainer config={rsvpChartConfig} className="mx-auto aspect-square max-h-[250px]">
-        <PieChart>
-          <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-          <Pie
-            data={chartData}
-            dataKey="count"
-            nameKey="status"
-            innerRadius={45}
-            outerRadius={70}
-            strokeWidth={3}
-            label={({
-              cx,
-              cy,
-              midAngle,
-              outerRadius,
-              payload,
-            }: {
-              cx: number;
-              cy: number;
-              midAngle: number;
-              outerRadius: number;
-              payload: { status: string; count: number };
-            }) => {
-              const RADIAN = Math.PI / 180;
-              const radius = outerRadius + 20;
-              const x = cx + radius * Math.cos(-midAngle * RADIAN);
-              const y = cy + radius * Math.sin(-midAngle * RADIAN);
-              const ex = cx + (outerRadius + 6) * Math.cos(-midAngle * RADIAN);
-              const ey = cy + (outerRadius + 6) * Math.sin(-midAngle * RADIAN);
-              return (
-                <g>
-                  <line x1={ex} y1={ey} x2={x} y2={y} stroke="var(--color-muted-foreground)" strokeWidth={1} />
-                  <text
-                    x={x}
-                    y={y}
-                    textAnchor={x > cx ? "start" : "end"}
-                    dominantBaseline="central"
-                    className="fill-foreground text-xs font-medium"
-                    dx={x > cx ? 4 : -4}
-                  >
-                    {payload.count}
-                  </text>
-                </g>
-              );
-            }}
-          >
-            <Label
-              content={({ viewBox }) => {
-                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                  return (
-                    <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 10} className="fill-foreground text-2xl font-bold">
-                        {total}
-                      </tspan>
-                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 10} className="fill-muted-foreground text-xs">
-                        Antworten
-                      </tspan>
-                    </text>
-                  );
-                }
-              }}
-            />
-          </Pie>
-        </PieChart>
-      </ChartContainer>
+    <div className="mt-4">
+      <div className="flex h-2 w-full overflow-hidden bg-muted">
+        {yes > 0 && <div className="bg-verdigris transition-all" style={{ width: `${yesPct}%` }} />}
+        {maybe > 0 && <div className="bg-golden transition-all" style={{ width: `${maybePct}%` }} />}
+        {no > 0 && <div className="bg-destructive transition-all" style={{ width: `${noPct}%` }} />}
+      </div>
+      <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+        {yes > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 bg-verdigris shrink-0" />
+            {yes} Zusagen
+          </span>
+        )}
+        {maybe > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 bg-golden shrink-0" />
+            {maybe} Vielleicht
+          </span>
+        )}
+        {no > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 bg-destructive shrink-0" />
+            {no} Absagen
+          </span>
+        )}
+      </div>
     </div>
   );
 }
