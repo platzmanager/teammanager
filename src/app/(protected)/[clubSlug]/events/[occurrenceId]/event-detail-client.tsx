@@ -156,6 +156,58 @@ export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: 
       : { border: "border-l-cerulean", bg: "bg-cerulean/5" }
     : { border: "border-l-sage", bg: "bg-sage/5" };
 
+  const hasParticipants = responses.length > 0 || nonResponders.length > 0;
+
+  const participantsList = hasParticipants && (
+    <div className="space-y-3">
+      {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
+        const items = sortedGrouped[status];
+        if (items.length === 0) return null;
+        const config = RESPONSE_CONFIG[status];
+        const Icon = config.icon;
+
+        return (
+          <div key={status} className="border border-border">
+            <div className={cn("flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30", config.color)}>
+              <Icon className="h-4 w-4" />
+              <span>{config.label} ({items.length})</span>
+            </div>
+            {items.map((r, i) => (
+              <div key={r.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < items.length - 1 && "border-b border-border")}>
+                <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold text-white", config.bg)}>
+                  {getInitials(r.member?.first_name ?? "", r.member?.last_name ?? "")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm">{r.member?.first_name} {r.member?.last_name}</span>
+                  {r.comment && (
+                    <p className="text-xs text-muted-foreground italic mt-0.5">{r.comment}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      {nonResponders.length > 0 && (
+        <div className="border border-border">
+          <div className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30 text-muted-foreground">
+            <ClockIcon className="h-4 w-4" />
+            <span>Ausstehend ({nonResponders.length})</span>
+          </div>
+          {nonResponders.map((m, i) => (
+            <div key={m.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-muted-foreground", i < nonResponders.length - 1 && "border-b border-border")}>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold bg-muted text-muted-foreground">
+                {getInitials(m.first_name, m.last_name)}
+              </div>
+              <span className="text-sm">{m.first_name} {m.last_name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div>
       {/* Back button */}
@@ -168,96 +220,96 @@ export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: 
         Zurück
       </button>
 
-      {/* Hero Header */}
-      <div className={cn("border-l-4 -mx-4 px-4 py-5", heroAccent.border, heroAccent.bg)}>
-        {teamName && (
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{teamName}</p>
-        )}
-
-        {isMatch ? (
-          <>
-            <h1 className="font-display text-3xl">{opponent}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1 text-sm font-bold uppercase text-muted-foreground">
-                {match.is_home ? <Home className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
-                {match.is_home ? "Heimspiel" : "Auswärtsspiel"}
-              </span>
-              {countdown && (
-                <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
-                  {countdown}
-                </span>
-              )}
-              {rsvpBadge}
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="font-display text-3xl">{event?.title}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold uppercase text-sage">
-                {event && EVENT_TYPE_LABELS[event.event_type]}
-              </span>
-              {countdown && (
-                <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
-                  {countdown}
-                </span>
-              )}
-              {rsvpBadge}
-            </div>
-          </>
-        )}
-
-        {occurrence.cancelled && (
-          <span className="mt-3 inline-block bg-destructive text-white px-2 py-0.5 text-xs font-bold uppercase">
-            Abgesagt
-          </span>
-        )}
-      </div>
-
-      {/* Date/Time/Location Block */}
-      <div className="mt-6 flex border border-border overflow-hidden">
-        <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center py-3 text-white", getDateBlockColor(currentResponse))}>
-          <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
-            {formatWeekdayShort(occurrence.start_date)}
-          </span>
-          <span className="font-display text-4xl leading-none">
-            {formatDay(occurrence.start_date)}
-          </span>
-          <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
-            {formatMonthShort(occurrence.start_date)}
-          </span>
-        </div>
-        <div className="flex-1 flex flex-col justify-center gap-1 px-4 py-3">
-          <span className="text-sm text-muted-foreground">{formatFullDate(occurrence.start_date)}</span>
-          {time && (
-            <span className="text-lg font-bold">{time}</span>
-          )}
-          {location && (
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(location)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-cerulean hover:text-cerulean/70 transition-colors"
-            >
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="underline-offset-2 hover:underline">{location}</span>
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Description (non-match events) */}
-      {!isMatch && event?.description && (
-        <p className="mt-4 text-sm text-muted-foreground">{event.description}</p>
-      )}
-
-      {/* Two-column layout on desktop: RSVP left, Participants right */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left column: RSVP + Summary */}
+      {/* Desktop: two-column layout — Left: info + RSVP, Right: participants */}
+      <div className="lg:grid lg:grid-cols-[1fr,1fr] lg:gap-8 lg:items-start">
+        {/* Left column */}
         <div>
+          {/* Hero Header */}
+          <div className={cn("border-l-4 -mx-4 px-4 py-5 lg:mx-0", heroAccent.border, heroAccent.bg)}>
+            {teamName && (
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{teamName}</p>
+            )}
+
+            {isMatch ? (
+              <>
+                <h1 className="font-display text-3xl">{opponent}</h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1 text-sm font-bold uppercase text-muted-foreground">
+                    {match.is_home ? <Home className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
+                    {match.is_home ? "Heimspiel" : "Auswärtsspiel"}
+                  </span>
+                  {countdown && (
+                    <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
+                      {countdown}
+                    </span>
+                  )}
+                  {rsvpBadge}
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-3xl">{event?.title}</h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold uppercase text-sage">
+                    {event && EVENT_TYPE_LABELS[event.event_type]}
+                  </span>
+                  {countdown && (
+                    <span className={cn("px-2 py-0.5 text-xs font-bold uppercase", getCountdownColor(countdown))}>
+                      {countdown}
+                    </span>
+                  )}
+                  {rsvpBadge}
+                </div>
+              </>
+            )}
+
+            {occurrence.cancelled && (
+              <span className="mt-3 inline-block bg-destructive text-white px-2 py-0.5 text-xs font-bold uppercase">
+                Abgesagt
+              </span>
+            )}
+          </div>
+
+          {/* Date/Time/Location Block */}
+          <div className="mt-6 flex border border-border overflow-hidden">
+            <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center py-3 text-white", getDateBlockColor(currentResponse))}>
+              <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
+                {formatWeekdayShort(occurrence.start_date)}
+              </span>
+              <span className="font-display text-4xl leading-none">
+                {formatDay(occurrence.start_date)}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
+                {formatMonthShort(occurrence.start_date)}
+              </span>
+            </div>
+            <div className="flex-1 flex flex-col justify-center gap-1 px-4 py-3">
+              <span className="text-sm text-muted-foreground">{formatFullDate(occurrence.start_date)}</span>
+              {time && (
+                <span className="text-lg font-bold">{time}</span>
+              )}
+              {location && (
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-cerulean hover:text-cerulean/70 transition-colors"
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="underline-offset-2 hover:underline">{location}</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Description (non-match events) */}
+          {!isMatch && event?.description && (
+            <p className="mt-4 text-sm text-muted-foreground">{event.description}</p>
+          )}
+
           {/* RSVP Buttons */}
           {!occurrence.cancelled && (
-            <div>
+            <div className="mt-8">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Rückmeldung</h2>
               <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
             </div>
@@ -269,64 +321,21 @@ export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: 
           )}
         </div>
 
-        {/* Right column: Participants */}
-        {(responses.length > 0 || nonResponders.length > 0) && (
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 lg:hidden">Teilnehmer</h2>
-
-            <div className="space-y-3">
-              {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
-                const items = sortedGrouped[status];
-                if (items.length === 0) return null;
-                const config = RESPONSE_CONFIG[status];
-                const Icon = config.icon;
-
-                return (
-                  <div key={status} className="border border-border">
-                    {/* Group header */}
-                    <div className={cn("flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30", config.color)}>
-                      <Icon className="h-4 w-4" />
-                      <span>{config.label} ({items.length})</span>
-                    </div>
-                    {/* Members */}
-                    {items.map((r, i) => (
-                      <div key={r.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < items.length - 1 && "border-b border-border")}>
-                        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold text-white", config.bg)}>
-                          {getInitials(r.member?.first_name ?? "", r.member?.last_name ?? "")}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm">{r.member?.first_name} {r.member?.last_name}</span>
-                          {r.comment && (
-                            <p className="text-xs text-muted-foreground italic mt-0.5">{r.comment}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-
-              {/* Non-responders */}
-              {nonResponders.length > 0 && (
-                <div className="border border-border">
-                  <div className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30 text-muted-foreground">
-                    <ClockIcon className="h-4 w-4" />
-                    <span>Ausstehend ({nonResponders.length})</span>
-                  </div>
-                  {nonResponders.map((m, i) => (
-                    <div key={m.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-muted-foreground", i < nonResponders.length - 1 && "border-b border-border")}>
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold bg-muted text-muted-foreground">
-                        {getInitials(m.first_name, m.last_name)}
-                      </div>
-                      <span className="text-sm">{m.first_name} {m.last_name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Right column: Participants (desktop) */}
+        {hasParticipants && (
+          <div className="hidden lg:block">
+            {participantsList}
           </div>
         )}
       </div>
+
+      {/* Participants (mobile — below everything) */}
+      {hasParticipants && (
+        <div className="mt-8 border-t border-border pt-6 lg:hidden">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Teilnehmer</h2>
+          {participantsList}
+        </div>
+      )}
     </div>
   );
 }

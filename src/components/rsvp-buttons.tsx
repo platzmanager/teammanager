@@ -80,7 +80,7 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
   const isSmall = size === "sm";
 
   return (
-    <div className={cn("grid grid-cols-3", isSmall ? "gap-1" : "gap-2")}>
+    <div className={cn("grid grid-cols-3 -m-1 p-1", isSmall ? "gap-1" : "gap-2")}>
       {(["yes", "maybe", "no"] as RsvpResponse[]).map((r) => {
         const config = RSVP_CONFIG[r];
         const Icon = config.icon;
