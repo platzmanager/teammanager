@@ -32,7 +32,6 @@ interface UnlinkedUser {
   first_name: string | null;
   last_name: string | null;
   birth_date: string | null;
-  role: string;
 }
 
 export function MembersClient({

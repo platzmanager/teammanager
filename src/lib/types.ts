@@ -104,7 +104,6 @@ export interface UserProfile {
   first_name?: string | null;
   last_name?: string | null;
   birth_date?: string | null;
-  player_uuid?: string | null;
   teams?: Team[];
   captainTeamIds: string[];
   created_at: string;

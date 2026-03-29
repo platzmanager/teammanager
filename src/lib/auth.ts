@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { Gender, AgeClass, UserProfile, Team, Member } from "@/lib/types";
+import { Gender, AgeClass, UserProfile, UserRole, Team, Member } from "@/lib/types";
 import { getCurrentClubId } from "@/lib/club";
 
 export async function getUserProfile(): Promise<UserProfile | null> {
@@ -9,18 +9,27 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 
   const { data: profileData } = await supabase
     .from("user_profiles")
-    .select("*")
+    .select("id, first_name, last_name, birth_date, created_at")
     .eq("id", user.id)
     .single();
 
   if (!profileData) return null;
 
-  // Load teams via member record (scoped to current club)
+  // Load club-scoped role and teams
   const clubId = await getCurrentClubId();
+  let role: UserRole = "user";
   let teams: Team[] = [];
   let captainTeamIds: string[] = [];
 
   if (clubId) {
+    const { data: ucData } = await supabase
+      .from("user_clubs")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("club_id", clubId)
+      .maybeSingle();
+    role = (ucData?.role as UserRole) ?? "user";
+
     const { data: memberData } = await supabase
       .from("members")
       .select("id, teams:member_team_assignments(role, team:teams(*))")
@@ -35,11 +44,10 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 
   return {
     id: profileData.id,
-    role: profileData.role,
+    role,
     first_name: profileData.first_name,
     last_name: profileData.last_name,
     birth_date: profileData.birth_date,
-    player_uuid: profileData.player_uuid,
     teams,
     captainTeamIds,
     created_at: profileData.created_at,

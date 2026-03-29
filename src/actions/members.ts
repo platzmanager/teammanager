@@ -527,13 +527,20 @@ export async function getUnlinkedUsers() {
 
     if (unlinkedUserIds.length === 0) return [];
 
-    // Fetch their profiles
+    // Fetch their profiles, excluding admins of this club
     const { data: profiles } = await supabase
       .from("user_profiles")
-      .select("id, first_name, last_name, birth_date, role")
+      .select("id, first_name, last_name, birth_date")
       .in("id", unlinkedUserIds);
 
-    return (profiles ?? []).filter((p) => p.role === "user");
+    const { data: adminUsers } = await supabase
+      .from("user_clubs")
+      .select("user_id")
+      .eq("club_id", clubId)
+      .eq("role", "admin");
+    const adminSet = new Set((adminUsers ?? []).map((a) => a.user_id));
+
+    return (profiles ?? []).filter((p) => !adminSet.has(p.id));
   });
 }
 
