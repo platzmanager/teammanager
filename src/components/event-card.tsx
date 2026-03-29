@@ -7,7 +7,7 @@ import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
 import { EVENT_TYPE_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { RsvpButtons } from "./rsvp-buttons";
+import { RsvpButtons, type RsvpCounts } from "./rsvp-buttons";
 
 interface EventCardProps {
   occurrence: EventOccurrence;
@@ -70,6 +70,17 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
   const opponent = isMatch ? (match.is_home ? match.away_team : match.home_team) : null;
   const location = isMatch ? match.location : event?.location;
   const dateColor = getDateBlockColor(optimisticResponse);
+
+  const rsvpCounts: RsvpCounts | undefined = occurrence.responses
+    ? occurrence.responses.reduce<RsvpCounts>(
+        (acc, r) => {
+          const key = ("response" in r ? r.response : null) as keyof RsvpCounts | null;
+          if (key) acc[key] += 1;
+          return acc;
+        },
+        { yes: 0, maybe: 0, no: 0 },
+      )
+    : undefined;
 
   const dateBlock = (
     <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center text-white", dateColor)}>
@@ -174,7 +185,7 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
           {/* Row 3: RSVP buttons (not inside link) */}
           {showRsvp && !occurrence.cancelled && (
             <div className="mt-auto pl-4 pt-4">
-              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} onChange={setOptimisticResponse} />
+              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} counts={rsvpCounts} onChange={setOptimisticResponse} />
             </div>
           )}
         </div>

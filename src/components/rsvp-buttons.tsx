@@ -8,9 +8,16 @@ import type { EventResponse, RsvpResponse } from "@/lib/types";
 import { RSVP_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+export interface RsvpCounts {
+  yes: number;
+  maybe: number;
+  no: number;
+}
+
 interface RsvpButtonsProps {
   occurrenceId: string;
   currentResponse?: EventResponse | null;
+  counts?: RsvpCounts;
   onChange?: (response: RsvpResponse) => void;
 }
 
@@ -36,19 +43,31 @@ const RSVP_CONFIG: Record<RsvpResponse, {
   },
 };
 
-export function RsvpButtons({ occurrenceId, currentResponse, onChange }: RsvpButtonsProps) {
+export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange }: RsvpButtonsProps) {
   const [current, setCurrent] = useState<RsvpResponse | null>(currentResponse?.response ?? null);
+  const [optimisticCounts, setOptimisticCounts] = useState<RsvpCounts | undefined>(counts);
   const [isPending, startTransition] = useTransition();
 
   function handleClick(response: RsvpResponse) {
+    const prev = current;
     setCurrent(response);
     onChange?.(response);
+    if (optimisticCounts) {
+      setOptimisticCounts((c) => {
+        if (!c) return c;
+        const next = { ...c };
+        if (prev) next[prev] = Math.max(0, next[prev] - 1);
+        next[response] += 1;
+        return next;
+      });
+    }
     startTransition(async () => {
       try {
         await respondToEvent(occurrenceId, response);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Fehler");
         setCurrent(currentResponse?.response ?? null);
+        setOptimisticCounts(counts);
       }
     });
   }
@@ -79,6 +98,9 @@ export function RsvpButtons({ occurrenceId, currentResponse, onChange }: RsvpBut
               <span className="text-sm font-bold leading-none">?</span>
             )}
             <span className="hidden sm:inline">{RSVP_LABELS[r]}</span>
+            {optimisticCounts != null && (
+              <span className="tabular-nums">({optimisticCounts[r]})</span>
+            )}
           </button>
         );
       })}
