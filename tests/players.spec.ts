@@ -35,7 +35,7 @@ test.beforeAll(async () => {
   await cleanupPlayers(clubId);
   testUserId = await createTestUserWithEmail(PLAYER_TEST_EMAIL, PLAYER_TEST_PASSWORD);
   await createUserProfile(testUserId, "admin");
-  await addUserToClub(testUserId, clubId);
+  await addUserToClub(testUserId, clubId, "admin");
 });
 
 test.afterAll(async () => {

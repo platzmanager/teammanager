@@ -62,7 +62,7 @@ test.beforeAll(async () => {
 
   adminUserId = await createTestUserWithEmail(ADMIN_EMAIL, ADMIN_PASSWORD);
   await createUserProfile(adminUserId, "admin");
-  await addUserToClub(adminUserId, clubId);
+  await addUserToClub(adminUserId, clubId, "admin");
 
   // Create teams for all relevant age classes
   const teams = [
@@ -277,7 +277,7 @@ test("admin can create a mixed youth team (U9) - gender hidden", async ({ page }
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 5000 });
 
-  await expect(page.getByRole("cell", { name: /Kleinfeld U9/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /Kleinfeld U9/i }).first()).toBeVisible({ timeout: 5000 });
 
   // Track for cleanup
   const res = await fetch(
@@ -308,7 +308,7 @@ test("admin can create a gendered youth team (U15)", async ({ page }) => {
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 5000 });
 
-  await expect(page.getByRole("cell", { name: /Knaben U15/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /Knaben U15/i }).first()).toBeVisible({ timeout: 5000 });
 
   // Track for cleanup
   const res = await fetch(

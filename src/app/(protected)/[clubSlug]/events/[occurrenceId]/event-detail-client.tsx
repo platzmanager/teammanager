@@ -1,9 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
+import { Label, Pie, PieChart } from "recharts";
 import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
-import { EVENT_TYPE_LABELS, RSVP_LABELS } from "@/lib/types";
+import { EVENT_TYPE_LABELS } from "@/lib/types";
 import { Home, MapPin, Globe, Check, HelpCircle, X, ArrowLeft, Calendar, Clock } from "lucide-react";
 import { RsvpButtons } from "@/components/rsvp-buttons";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
@@ -70,6 +73,20 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
   const location = isMatch ? match.location : event?.location;
   const responses = (occurrence.responses ?? []) as EventResponse[];
   const grouped = groupResponsesByStatus(responses);
+  const teamName = event?.team?.name;
+  const currentResponse = myResponse?.response ?? null;
+
+  const rsvpBadge = currentResponse ? (() => {
+    const RsvpIcon = currentResponse === "yes" ? Check : currentResponse === "no" ? X : null;
+    const rsvpColor = currentResponse === "yes" ? "bg-verdigris/15 text-verdigris" : currentResponse === "maybe" ? "bg-golden/15 text-golden" : "bg-destructive/15 text-destructive";
+    const rsvpLabel = currentResponse === "yes" ? "Dabei" : currentResponse === "maybe" ? "Unsicher" : "Nicht dabei";
+    return (
+      <span className={cn("ml-auto flex items-center gap-1 px-1.5 text-xs font-bold uppercase shrink-0", rsvpColor)}>
+        {RsvpIcon ? <RsvpIcon className="h-3.5 w-3.5" /> : <span className="text-xs font-bold">?</span>}
+        {rsvpLabel}
+      </span>
+    );
+  })() : null;
 
   return (
     <div className="space-y-6">
@@ -83,16 +100,18 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
         Zurück
       </button>
 
+      {/* Team context */}
+      {teamName && (
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{teamName}</p>
+      )}
+
       {/* Header */}
       <div>
         {isMatch ? (
           <>
             <h1 className="text-2xl font-bold">{opponent}</h1>
             <div className="mt-2 flex items-center gap-2">
-              <span className={cn(
-                "flex items-center gap-1 text-sm font-bold uppercase",
-                match.is_home ? "text-verdigris" : "text-cerulean"
-              )}>
+              <span className="flex items-center gap-1 text-sm font-bold uppercase text-muted-foreground">
                 {match.is_home ? <Home className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
                 {match.is_home ? "Heimspiel" : "Auswärtsspiel"}
               </span>
@@ -101,6 +120,7 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
                   {countdown}
                 </span>
               )}
+              {rsvpBadge}
             </div>
           </>
         ) : (
@@ -115,6 +135,7 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
                   {countdown}
                 </span>
               )}
+              {rsvpBadge}
             </div>
           </>
         )}
@@ -164,6 +185,9 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
         </div>
       )}
 
+      {/* RSVP Chart */}
+      {responses.length > 0 && <RsvpChart grouped={grouped} />}
+
       {/* Responses list */}
       {responses.length > 0 && (
         <div className="space-y-4">
@@ -195,6 +219,96 @@ export function EventDetailClient({ occurrence, myResponse }: EventDetailClientP
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const rsvpChartConfig = {
+  count: { label: "Antworten" },
+  yes: { label: "Dabei", color: "var(--color-verdigris)" },
+  maybe: { label: "Unsicher", color: "var(--color-golden)" },
+  no: { label: "Nicht dabei", color: "var(--color-destructive)" },
+} satisfies ChartConfig;
+
+function RsvpChart({ grouped }: { grouped: Record<RsvpResponse, EventResponse[]> }) {
+  const chartData = useMemo(() => [
+    { status: "yes", count: grouped.yes.length, fill: "var(--color-yes)" },
+    { status: "maybe", count: grouped.maybe.length, fill: "var(--color-maybe)" },
+    { status: "no", count: grouped.no.length, fill: "var(--color-no)" },
+  ].filter((d) => d.count > 0), [grouped]);
+
+  const total = useMemo(() => chartData.reduce((acc, d) => acc + d.count, 0), [chartData]);
+
+  if (total === 0) return null;
+
+  return (
+    <div>
+      <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Übersicht</h2>
+      <ChartContainer config={rsvpChartConfig} className="mx-auto aspect-square max-h-[250px]">
+        <PieChart>
+          <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+          <Pie
+            data={chartData}
+            dataKey="count"
+            nameKey="status"
+            innerRadius={45}
+            outerRadius={70}
+            strokeWidth={3}
+            label={({
+              cx,
+              cy,
+              midAngle,
+              outerRadius,
+              payload,
+            }: {
+              cx: number;
+              cy: number;
+              midAngle: number;
+              outerRadius: number;
+              payload: { status: string; count: number };
+            }) => {
+              const RADIAN = Math.PI / 180;
+              const radius = outerRadius + 20;
+              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+              const ex = cx + (outerRadius + 6) * Math.cos(-midAngle * RADIAN);
+              const ey = cy + (outerRadius + 6) * Math.sin(-midAngle * RADIAN);
+              return (
+                <g>
+                  <line x1={ex} y1={ey} x2={x} y2={y} stroke="var(--color-muted-foreground)" strokeWidth={1} />
+                  <text
+                    x={x}
+                    y={y}
+                    textAnchor={x > cx ? "start" : "end"}
+                    dominantBaseline="central"
+                    className="fill-foreground text-xs font-medium"
+                    dx={x > cx ? 4 : -4}
+                  >
+                    {payload.count}
+                  </text>
+                </g>
+              );
+            }}
+          >
+            <Label
+              content={({ viewBox }) => {
+                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                  return (
+                    <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 10} className="fill-foreground text-2xl font-bold">
+                        {total}
+                      </tspan>
+                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 10} className="fill-muted-foreground text-xs">
+                        Antworten
+                      </tspan>
+                    </text>
+                  );
+                }
+              }}
+            />
+          </Pie>
+        </PieChart>
+      </ChartContainer>
     </div>
   );
 }

@@ -89,7 +89,7 @@ test.beforeAll(async () => {
   clubId = await createClubViaApi("Members Events Test Club", CLUB_SLUG);
   adminUserId = await createTestUserWithEmail(ADMIN_EMAIL, ADMIN_PASSWORD);
   await createUserProfile(adminUserId, "admin");
-  await addUserToClub(adminUserId, clubId);
+  await addUserToClub(adminUserId, clubId, "admin");
 
   teamId = await createTeamViaApi("Herren I", "male", "all", clubId);
 
@@ -97,14 +97,12 @@ test.beforeAll(async () => {
   await createUserProfile(captainUserId, "user", { clubId, captainTeamIds: teamId });
   await addUserToClub(captainUserId, clubId);
 
-  // Create member records for admin and captain so RSVP works
+  // Create member record for admin so RSVP works
+  // (captain member already created by createUserProfile with captainTeamIds)
   await fetch(`${SUPABASE_URL}/rest/v1/members`, {
     method: "POST",
     headers: { ...serviceHeadersJson(), Prefer: "return=minimal" },
-    body: JSON.stringify([
-      { club_id: clubId, user_id: adminUserId, first_name: "Admin", last_name: "User", email: ADMIN_EMAIL },
-      { club_id: clubId, user_id: captainUserId, first_name: "Captain", last_name: "User", email: CAPTAIN_EMAIL },
-    ]),
+    body: JSON.stringify({ club_id: clubId, user_id: adminUserId, first_name: "Admin", last_name: "User", email: ADMIN_EMAIL }),
   });
 });
 
@@ -255,10 +253,11 @@ test("public join page shows registration form", async ({ browser }) => {
   const response = await page.goto(`/join/${inviteToken}`);
   await expect(page.getByRole("heading", { name: "Registrieren" })).toBeVisible({ timeout: 10000 });
   await expect(page.getByText("Herren I")).toBeVisible();
+  // Step 1: personal info
   await expect(page.getByLabel("Vorname")).toBeVisible();
   await expect(page.getByLabel("Nachname")).toBeVisible();
-  await expect(page.getByLabel("E-Mail")).toBeVisible();
-  await expect(page.getByLabel("Passwort")).toBeVisible();
+  await expect(page.getByLabel("Geburtsdatum")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Weiter" })).toBeVisible();
   await context.close();
 });
 
@@ -269,9 +268,14 @@ test("new member can register via invite link", async ({ browser }) => {
   await page.goto(`/join/${inviteToken}`);
   await expect(page.getByLabel("Vorname")).toBeVisible({ timeout: 10000 });
 
+  // Step 1: personal info
   await page.getByLabel("Vorname").fill("Neues");
   await page.getByLabel("Nachname").fill("Mitglied");
   await page.getByLabel("Geburtsdatum").fill("1995-06-15");
+  await page.getByRole("button", { name: "Weiter" }).click();
+
+  // Step 2: account info
+  await expect(page.getByLabel("E-Mail")).toBeVisible({ timeout: 5000 });
   await page.getByLabel("E-Mail").fill("newmember@test.local");
   await page.getByLabel("Passwort").fill("test123456");
 

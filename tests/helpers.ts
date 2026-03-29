@@ -95,14 +95,13 @@ export async function loginAs(page: Page, email: string, password: string) {
 
 export async function createUserProfile(
   userId: string,
-  role: "admin" | "user",
+  _role: "admin" | "user",
   options?: { clubId?: string; captainTeamIds?: string | string[] },
 ) {
-  const body: Record<string, string> = { id: userId, role };
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
     method: "POST",
     headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ id: userId }),
   });
   expect(res.ok).toBeTruthy();
 
@@ -175,11 +174,11 @@ export async function deleteClubViaApi(id: string) {
   });
 }
 
-export async function addUserToClub(userId: string, clubId: string) {
+export async function addUserToClub(userId: string, clubId: string, role: "admin" | "user" = "user") {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_clubs`, {
     method: "POST",
     headers: { ...serviceHeadersJson(), Prefer: "return=minimal,resolution=merge-duplicates" },
-    body: JSON.stringify({ user_id: userId, club_id: clubId }),
+    body: JSON.stringify({ user_id: userId, club_id: clubId, role }),
   });
   expect(res.ok).toBeTruthy();
 }

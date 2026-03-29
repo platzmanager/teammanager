@@ -1,11 +1,13 @@
 "use client";
 
-import type { EventOccurrence, EventResponse } from "@/lib/types";
-import { EVENT_TYPE_LABELS } from "@/lib/types";
-import { ChevronRight, Globe, Home, MapPin } from "lucide-react";
+import { Check, ChevronRight, Globe, Home, MapPin, X } from "lucide-react";
 import Link from "next/link";
-import { RsvpButtons } from "./rsvp-buttons";
+import { useState } from "react";
+import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
+import { EVENT_TYPE_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+import { RsvpButtons } from "./rsvp-buttons";
 
 interface EventCardProps {
   occurrence: EventOccurrence;
@@ -48,12 +50,17 @@ function getCountdownColor(c: string): string {
   return "bg-sage text-white";
 }
 
-function getDateBlockColor(isMatch: boolean, isHome?: boolean): string {
-  if (!isMatch) return "bg-cerulean";
-  return isHome ? "bg-verdigris" : "bg-cerulean";
+function getDateBlockColor(response?: string | null): string {
+  switch (response) {
+    case "yes": return "bg-verdigris";
+    case "maybe": return "bg-golden";
+    case "no": return "bg-destructive";
+    default: return "bg-[#D4B483]";
+  }
 }
 
 export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }: EventCardProps) {
+  const [optimisticResponse, setOptimisticResponse] = useState<RsvpResponse | null>(myResponse?.response ?? null);
   const event = occurrence.event;
   const match = occurrence.match;
   const isMatch = event?.event_type === "match" && match;
@@ -62,10 +69,10 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
 
   const opponent = isMatch ? (match.is_home ? match.away_team : match.home_team) : null;
   const location = isMatch ? match.location : event?.location;
-  const dateColor = getDateBlockColor(!!isMatch, isMatch ? match.is_home : undefined);
+  const dateColor = getDateBlockColor(optimisticResponse);
 
   const dateBlock = (
-    <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center py-4 text-white", dateColor)}>
+    <div className={cn("flex w-20 shrink-0 flex-col items-center justify-center text-white", dateColor)}>
       <span className="text-[11px] font-bold uppercase tracking-widest opacity-70">
         {formatWeekdayShort(occurrence.start_date)}
       </span>
@@ -78,24 +85,38 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
     </div>
   );
 
-  const infoBlock = (
-    <div className="flex-1 px-4 pb-3">
-      {isMatch ? (
-        <p className="text-lg font-bold leading-tight text-foreground">
-          {opponent}
-        </p>
-      ) : (
-        <p className="text-lg font-bold leading-tight text-foreground">
-          {event?.title}
-        </p>
-      )}
+  const rsvpBadge = optimisticResponse ? (() => {
+    const RsvpIcon = optimisticResponse === "yes" ? Check : optimisticResponse === "no" ? X : null;
+    const rsvpColor = optimisticResponse === "yes" ? "bg-verdigris/15 text-verdigris" : optimisticResponse === "maybe" ? "bg-golden/15 text-golden" : "bg-destructive/15 text-destructive";
+    const rsvpLabel = optimisticResponse === "yes" ? "Dabei" : optimisticResponse === "maybe" ? "Unsicher" : "Nicht dabei";
+    return (
+      <span className={cn("ml-auto flex items-center gap-1 px-1.5 text-[10px] font-bold uppercase shrink-0", rsvpColor)}>
+        {RsvpIcon ? <RsvpIcon className="h-3 w-3" /> : <span className="text-[10px] font-bold">?</span>}
+        {rsvpLabel}
+      </span>
+    );
+  })() : null;
 
-      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+  const titleContent = (
+    <p className="text-lg font-bold leading-tight text-foreground">
+      {isMatch ? opponent : event?.title}
+    </p>
+  );
+
+  const detailHref = clubSlug ? `/${clubSlug}/events/${occurrence.id}` : null;
+
+  const infoContent = (
+    <>
+      {/* Row 1: Title + arrow */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">{titleContent}</div>
+        {detailHref && <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />}
+      </div>
+
+      {/* Row 2: Location/time info + RSVP badge */}
+      <div className="mt-1.5 flex items-center gap-2">
         {isMatch && (
-          <span className={cn(
-            "flex items-center gap-1 text-[11px] font-bold uppercase",
-            match.is_home ? "text-verdigris" : "text-cerulean"
-          )}>
+          <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-muted-foreground">
             {match.is_home ? <Home className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
             {match.is_home ? "Heimspiel" : "Auswärts"}{time && ` um ${time}`}
           </span>
@@ -110,6 +131,7 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
             {countdown}
           </span>
         )}
+        {rsvpBadge}
       </div>
 
       {occurrence.cancelled && (
@@ -128,26 +150,31 @@ export function EventCard({ occurrence, myResponse, showRsvp = true, clubSlug }:
           <span>{location}</span>
         </p>
       )}
-    </div>
+    </>
   );
 
   return (
     <div className={cn("overflow-hidden", occurrence.cancelled && "opacity-50")}>
       <div className="flex">
-        {dateBlock}
+        {detailHref ? (
+          <Link href={detailHref} className="flex">{dateBlock}</Link>
+        ) : (
+          dateBlock
+        )}
         <div className="flex-1 min-w-0 flex flex-col">
-          {clubSlug ? (
-            <Link href={`/${clubSlug}/events/${occurrence.id}`} className="flex hover:bg-muted/50 transition-colors">
-              <div className="flex-1 min-w-0">{infoBlock}</div>
-              <ChevronRight className="h-5 w-5 shrink-0 mr-3 text-muted-foreground" />
+          {/* Clickable area: rows 1+2 */}
+          {detailHref ? (
+            <Link href={detailHref} className="flex-1 pl-4">
+              {infoContent}
             </Link>
           ) : (
-            infoBlock
+            <div className="flex-1 pl-4">{infoContent}</div>
           )}
 
+          {/* Row 3: RSVP buttons (not inside link) */}
           {showRsvp && !occurrence.cancelled && (
-            <div className="mt-auto">
-              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
+            <div className="mt-auto pl-4 pt-4">
+              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} onChange={setOptimisticResponse} />
             </div>
           )}
         </div>

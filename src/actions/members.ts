@@ -419,7 +419,6 @@ export async function registerViaInvite(
     .from("user_profiles")
     .insert({
       id: userId,
-      role: "user",
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       birth_date: birthDate,

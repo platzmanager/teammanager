@@ -17,7 +17,7 @@ test.beforeAll(async () => {
   clubId = await createClubViaApi("Auth Test Club", "auth-test");
   testUserId = await createTestUser();
   await createUserProfile(testUserId, "admin");
-  await addUserToClub(testUserId, clubId);
+  await addUserToClub(testUserId, clubId, "admin");
 });
 
 test.afterAll(async () => {

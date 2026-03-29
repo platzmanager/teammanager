@@ -34,8 +34,8 @@ test.beforeAll(async () => {
   // Create admin user assigned to both clubs
   adminUserId = await createTestUserWithEmail(ADMIN_EMAIL, ADMIN_PASSWORD);
   await createUserProfile(adminUserId, "admin");
-  await addUserToClub(adminUserId, clubAId);
-  await addUserToClub(adminUserId, clubBId);
+  await addUserToClub(adminUserId, clubAId, "admin");
+  await addUserToClub(adminUserId, clubBId, "admin");
 
   // Create a team in each club (same name to test uniqueness per club)
   teamAId = await createTeamViaApi("Herren 30 I", "male", "30", clubAId);
@@ -170,7 +170,7 @@ test("teams are scoped per club", async ({ page }) => {
   await page.goto("/tv-alpha/teams");
 
   // Should see the team for club A
-  await expect(page.getByRole("cell", { name: "Herren 30 I" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Herren 30 I" })).toBeVisible({
     timeout: 5000,
   });
 });
@@ -181,7 +181,7 @@ test("single-club user auto-resolves without club-select", async ({ page }) => {
   const singlePassword = "test123456";
   const singleUserId = await createTestUserWithEmail(singleEmail, singlePassword);
   await createUserProfile(singleUserId, "admin");
-  await addUserToClub(singleUserId, clubAId);
+  await addUserToClub(singleUserId, clubAId, "admin");
 
   try {
     await page.goto("/login");
