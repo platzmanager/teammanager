@@ -3,8 +3,9 @@
 import { ArrowLeft, Check, Clock as ClockIcon, Globe, HelpCircle, Home, MapPin, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { LineupEditor } from "@/components/lineup-editor";
 import { RsvpButtons } from "@/components/rsvp-buttons";
-import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
+import type { EventOccurrence, EventResponse, MatchLineup, Player, RsvpResponse } from "@/lib/types";
 import { EVENT_TYPE_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,10 @@ interface EventDetailClientProps {
   occurrence: EventOccurrence;
   myResponse: EventResponse | null;
   teamMembers?: TeamMemberWithSort[];
+  lineup?: MatchLineup[];
+  matchCounts?: Record<string, number>;
+  teamPlayers?: Player[];
+  isCaptain?: boolean;
 }
 
 function formatFullDate(iso: string) {
@@ -94,7 +99,7 @@ const RESPONSE_CONFIG: Record<RsvpResponse, { label: string; icon: typeof Check;
   no: { label: "Absagen", icon: X, color: "text-destructive", bg: "bg-destructive" },
 };
 
-export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: EventDetailClientProps) {
+export function EventDetailClient({ occurrence, myResponse, teamMembers = [], lineup = [], matchCounts = {}, teamPlayers = [], isCaptain = false }: EventDetailClientProps) {
   const router = useRouter();
   const event = occurrence.event;
   const match = occurrence.match;
@@ -318,6 +323,21 @@ export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: 
           {/* RSVP Summary Bar */}
           {responses.length > 0 && (
             <RsvpSummaryBar grouped={grouped} />
+          )}
+
+          {/* Lineup Editor (match events only) */}
+          {isMatch && teamPlayers.length > 0 && (
+            <div className="mt-8">
+              <LineupEditor
+                matchId={match.id}
+                players={teamPlayers}
+                responses={responses}
+                lineup={lineup}
+                matchCounts={matchCounts}
+                isCaptain={isCaptain}
+                teamSize={occurrence.event?.team?.team_size ?? 0}
+              />
+            </div>
           )}
         </div>
 
