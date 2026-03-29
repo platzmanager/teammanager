@@ -1,12 +1,11 @@
-import { getUserClubs, switchClub } from "@/actions/club";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import Image from "next/image";
+import { redirect } from "next/navigation";
+import { getUserClubs, switchClub } from "@/actions/club";
 import logo from "@/assets/logo/matchday-slogan-green.svg";
+import { getUser } from "@/lib/supabase/server";
 
 export default async function ClubSelectPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) redirect("/login");
 
   const clubs = await getUserClubs();

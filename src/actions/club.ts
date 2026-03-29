@@ -1,14 +1,14 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Club } from "@/lib/types";
 
 export async function getUserClubs(): Promise<Club[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return [];
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("user_clubs").select("club:clubs(*)").eq("user_id", user.id);
   if (error) throw error;
@@ -16,9 +16,9 @@ export async function getUserClubs(): Promise<Club[]> {
 }
 
 export async function switchClub(clubId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) throw new Error("Nicht angemeldet");
+  const supabase = await createClient();
   const { data } = await supabase
     .from("user_clubs").select("club_id")
     .eq("user_id", user.id).eq("club_id", clubId).single();

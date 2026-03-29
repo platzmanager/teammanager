@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import { MobileNav } from "@/components/mobile-nav";
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import { getUserProfile, getUserGenders } from "@/lib/auth";
 import { getUserClubs } from "@/actions/club";
 import { getCurrentClubId } from "@/lib/club";
@@ -12,21 +12,19 @@ export default async function ProtectedLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getUser();
 
 	if (!user) {
 		redirect("/login");
 	}
 
-	const profile = await getUserProfile();
+	const [profile, clubs, currentClubId] = await Promise.all([
+		getUserProfile(),
+		getUserClubs(),
+		getCurrentClubId(),
+	]);
 	const isAdmin = profile?.role === "admin";
 	const genders = profile ? getUserGenders(profile) : [];
-
-	const clubs = await getUserClubs();
-	const currentClubId = await getCurrentClubId();
 	const currentClub = clubs.find((c) => c.id === currentClubId);
 	if (!currentClub) {
 		redirect("/api/club/resolve");
