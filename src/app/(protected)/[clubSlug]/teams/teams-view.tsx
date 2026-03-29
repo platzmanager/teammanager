@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ChevronRight, Globe, Home, Loader2, Lock } from "lucide-react";
+import { Calendar, ChevronRight, Globe, Home, Lock } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { getNextMatches, getPendingMatchCounts, getTeams } from "@/actions/teams";
