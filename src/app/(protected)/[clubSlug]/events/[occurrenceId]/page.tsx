@@ -75,12 +75,14 @@ async function getTeamPlayers(teamId: string, clubId: string): Promise<Player[]>
   const admin = createAdminClient();
 
   // Single query: get player_uuids assigned to this team
-  const { data: assignments } = await admin
+  const { data: assignments, error: assignError } = await admin
     .from("member_team_assignments")
     .select("members!inner(player_uuid)")
     .eq("team_id", teamId);
 
-  const rosterUuids = (assignments ?? [])
+  if (assignError || !assignments) return [];
+
+  const rosterUuids = assignments
     .map((a) => (a.members as unknown as { player_uuid: string | null })?.player_uuid)
     .filter(Boolean) as string[];
 
@@ -123,10 +125,10 @@ export default async function EventDetailPage({
   const teamMembers = teamId ? await getTeamRoster(teamId) : [];
 
   // Lineup data (only for match events)
-  const isMatch = occurrence.event?.event_type === "match" && matchId;
+  const isMatch = occurrence.event?.event_type === "match" && matchId != null;
   const isCaptain = profile.role === "admin" || (teamId ? profile.captainTeamIds.includes(teamId) : false);
 
-  const [lineup, matchCounts, teamPlayers] = isMatch && teamId
+  const [lineup, matchCounts, teamPlayers] = isMatch && teamId && matchId
     ? await Promise.all([
         getLineup(matchId),
         getSeasonMatchCounts(teamId),

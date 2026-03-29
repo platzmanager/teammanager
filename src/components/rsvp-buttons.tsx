@@ -149,6 +149,7 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
                 onChange={(e) => setComment(e.target.value.slice(0, 200))}
                 placeholder="z.B. Kann nur zum Einzel..."
                 rows={2}
+                maxLength={200}
                 className="w-full border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
               <div className="flex items-center justify-between">
@@ -156,7 +157,10 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowComment(false)}
+                    onClick={() => {
+                      setShowComment(false);
+                      setComment(currentResponse?.comment ?? "");
+                    }}
                     className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Abbrechen
