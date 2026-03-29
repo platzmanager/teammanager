@@ -1,12 +1,12 @@
 "use client";
 
+import { ArrowLeft, Check, Clock as ClockIcon, Globe, HelpCircle, Home, MapPin, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { RsvpButtons } from "@/components/rsvp-buttons";
 import type { EventOccurrence, EventResponse, RsvpResponse } from "@/lib/types";
 import { EVENT_TYPE_LABELS } from "@/lib/types";
-import { Home, MapPin, Globe, Check, HelpCircle, X, ArrowLeft, Clock as ClockIcon } from "lucide-react";
-import { RsvpButtons } from "@/components/rsvp-buttons";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 export interface TeamMemberWithSort {
   id: string;
@@ -251,76 +251,82 @@ export function EventDetailClient({ occurrence, myResponse, teamMembers = [] }: 
         <p className="mt-4 text-sm text-muted-foreground">{event.description}</p>
       )}
 
-      {/* RSVP Buttons */}
-      {!occurrence.cancelled && (
-        <div className="mt-8">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Rückmeldung</h2>
-          <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
+      {/* Two-column layout on desktop: RSVP left, Participants right */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left column: RSVP + Summary */}
+        <div>
+          {/* RSVP Buttons */}
+          {!occurrence.cancelled && (
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Rückmeldung</h2>
+              <RsvpButtons occurrenceId={occurrence.id} currentResponse={myResponse} />
+            </div>
+          )}
+
+          {/* RSVP Summary Bar */}
+          {responses.length > 0 && (
+            <RsvpSummaryBar grouped={grouped} />
+          )}
         </div>
-      )}
 
-      {/* RSVP Summary Bar */}
-      {responses.length > 0 && (
-        <RsvpSummaryBar grouped={grouped} />
-      )}
+        {/* Right column: Participants */}
+        {(responses.length > 0 || nonResponders.length > 0) && (
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 lg:hidden">Teilnehmer</h2>
 
-      {/* Participants List */}
-      {(responses.length > 0 || nonResponders.length > 0) && (
-        <div className="mt-8 border-t border-border pt-6">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Teilnehmer</h2>
+            <div className="space-y-3">
+              {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
+                const items = sortedGrouped[status];
+                if (items.length === 0) return null;
+                const config = RESPONSE_CONFIG[status];
+                const Icon = config.icon;
 
-          <div className="border border-border">
-            {(["yes", "maybe", "no"] as RsvpResponse[]).map((status) => {
-              const items = sortedGrouped[status];
-              if (items.length === 0) return null;
-              const config = RESPONSE_CONFIG[status];
-              const Icon = config.icon;
-
-              return (
-                <div key={status}>
-                  {/* Group header */}
-                  <div className={cn("flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30", config.color)}>
-                    <Icon className="h-4 w-4" />
-                    <span>{config.label} ({items.length})</span>
+                return (
+                  <div key={status} className="border border-border">
+                    {/* Group header */}
+                    <div className={cn("flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30", config.color)}>
+                      <Icon className="h-4 w-4" />
+                      <span>{config.label} ({items.length})</span>
+                    </div>
+                    {/* Members */}
+                    {items.map((r, i) => (
+                      <div key={r.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < items.length - 1 && "border-b border-border")}>
+                        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold text-white", config.bg)}>
+                          {getInitials(r.member?.first_name ?? "", r.member?.last_name ?? "")}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm">{r.member?.first_name} {r.member?.last_name}</span>
+                          {r.comment && (
+                            <p className="text-xs text-muted-foreground italic mt-0.5">{r.comment}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {/* Members */}
-                  {items.map((r, i) => (
-                    <div key={r.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < items.length - 1 && "border-b border-border")}>
-                      <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold text-white", config.bg)}>
-                        {getInitials(r.member?.first_name ?? "", r.member?.last_name ?? "")}
+                );
+              })}
+
+              {/* Non-responders */}
+              {nonResponders.length > 0 && (
+                <div className="border border-border">
+                  <div className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30 text-muted-foreground">
+                    <ClockIcon className="h-4 w-4" />
+                    <span>Ausstehend ({nonResponders.length})</span>
+                  </div>
+                  {nonResponders.map((m, i) => (
+                    <div key={m.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-muted-foreground", i < nonResponders.length - 1 && "border-b border-border")}>
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold bg-muted text-muted-foreground">
+                        {getInitials(m.first_name, m.last_name)}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm">{r.member?.first_name} {r.member?.last_name}</span>
-                        {r.comment && (
-                          <p className="text-xs text-muted-foreground italic mt-0.5">{r.comment}</p>
-                        )}
-                      </div>
+                      <span className="text-sm">{m.first_name} {m.last_name}</span>
                     </div>
                   ))}
                 </div>
-              );
-            })}
-
-            {/* Non-responders */}
-            {nonResponders.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-b border-border bg-muted/30 text-muted-foreground">
-                  <ClockIcon className="h-4 w-4" />
-                  <span>Ausstehend ({nonResponders.length})</span>
-                </div>
-                {nonResponders.map((m, i) => (
-                  <div key={m.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-muted-foreground", i < nonResponders.length - 1 && "border-b border-border")}>
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center text-[11px] font-bold bg-muted text-muted-foreground">
-                      {getInitials(m.first_name, m.last_name)}
-                    </div>
-                    <span className="text-sm">{m.first_name} {m.last_name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

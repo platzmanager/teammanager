@@ -96,7 +96,7 @@ export function RsvpButtons({ occurrenceId, currentResponse, counts, onChange, s
               "flex items-center justify-center font-bold uppercase tracking-wide transition-all disabled:opacity-50",
               isSmall ? "gap-1.5 py-2 text-xs" : "gap-2 py-3 text-sm",
               isActive
-                ? cn(config.activeBg, !isSmall && config.activeRing)
+                ? cn(config.activeBg, config.activeRing)
                 : config.inactiveBg,
             )}
           >
