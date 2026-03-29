@@ -29,8 +29,14 @@ const veneerThree = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://app.matchday.tennis"),
   title: "TC Thalkirchen - Meldelisten",
   description: "Meldelisten-Verwaltung für den Tennisverein",
+  openGraph: {
+    type: "website",
+    siteName: "matchday.tennis",
+    locale: "de_DE",
+  },
 };
 
 export default function RootLayout({
