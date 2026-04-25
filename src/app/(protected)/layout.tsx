@@ -24,6 +24,7 @@ export default async function ProtectedLayout({
 		getCurrentClubId(),
 	]);
 	const isAdmin = profile?.role === "admin";
+	const isGastro = profile?.role === "gastro" || isAdmin;
 	const genders = profile ? getUserGenders(profile) : [];
 	const currentClub = clubs.find((c) => c.id === currentClubId);
 	if (!currentClub) {
@@ -75,6 +76,14 @@ export default async function ProtectedLayout({
 					>
 						Termine
 					</Link>
+					{isGastro && (
+						<Link
+							href={`/${clubSlug}/gastro`}
+							className="border-b-2 border-transparent px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+						>
+							Essenszuschuss
+						</Link>
+					)}
 					{isAdmin && (
 						<>
 							<Link
@@ -98,6 +107,7 @@ export default async function ProtectedLayout({
 			<MobileNav
 				clubSlug={clubSlug}
 				isAdmin={isAdmin}
+				isGastro={isGastro}
 				hasPlayers={genders.length > 0}
 				firstGender={genders[0] ?? "male"}
 			/>

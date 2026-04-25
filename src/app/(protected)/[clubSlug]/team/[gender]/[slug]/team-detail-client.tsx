@@ -20,6 +20,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { inviteCaptain, removeCaptain } from "@/actions/teams";
+import { MealClaimTab } from "@/components/meal-claim-tab";
 import { EventForm } from "@/components/event-form";
 import { EventList } from "@/components/event-list";
 import { InviteLink } from "@/components/invite-link";
@@ -50,6 +51,22 @@ export interface Captain {
 	name: string;
 }
 
+interface HomeMatchWithClaim {
+	id: string;
+	match_date: string;
+	match_time: string | null;
+	home_team: string;
+	away_team: string;
+	location: string | null;
+	meal_claims: {
+		id: string;
+		meal_count: number;
+		amount_per_meal: number;
+		notes: string | null;
+		status: "submitted" | "confirmed" | "settled";
+	}[] | null;
+}
+
 interface TeamDetailClientProps {
 	team: Team;
 	captains: Captain[];
@@ -61,6 +78,8 @@ interface TeamDetailClientProps {
 	isAdmin: boolean;
 	isCaptain: boolean;
 	clubSlug: string;
+	homeMatches: HomeMatchWithClaim[];
+	amountPerMeal: number;
 }
 
 function formatDate(iso: string) {
@@ -89,12 +108,14 @@ export function TeamDetailClient({
 	isAdmin,
 	isCaptain,
 	clubSlug,
+	homeMatches,
+	amountPerMeal,
 }: TeamDetailClientProps) {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const pathname = usePathname();
 
-	const validTabs = ["termine", "meldeliste", "settings"] as const;
+	const validTabs = ["termine", "meldeliste", "essen", "settings"] as const;
 	const tabParam = searchParams.get("tab");
 	const activeTab = validTabs.includes(tabParam as (typeof validTabs)[number])
 		? (tabParam as string)
@@ -210,6 +231,9 @@ export function TeamDetailClient({
 				<TabsList variant="line">
 					<TabsTrigger value="termine">Termine</TabsTrigger>
 					<TabsTrigger value="meldeliste">Meldeliste</TabsTrigger>
+					{(isAdmin || isCaptain) && (
+						<TabsTrigger value="essen">Essen</TabsTrigger>
+					)}
 					{(isAdmin || isCaptain) && (
 						<TabsTrigger value="settings">Settings</TabsTrigger>
 					)}
@@ -411,6 +435,16 @@ export function TeamDetailClient({
 						</div>
 					)}
 				</TabsContent>
+
+				{/* Essensmeldung */}
+				{(isAdmin || isCaptain) && (
+					<TabsContent value="essen" className="space-y-4 pt-4">
+						<MealClaimTab
+							homeMatches={homeMatches}
+							amountPerMeal={amountPerMeal}
+						/>
+					</TabsContent>
+				)}
 
 				{/* Settings */}
 				{(isAdmin || isCaptain) && (

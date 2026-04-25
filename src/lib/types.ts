@@ -27,7 +27,7 @@ export const AGE_CLASS_CONFIG: Record<AgeClass, AgeClassInfo> = {
   u15: { label: "U15", isYouth: true, isMixed: false, maxAge: 15, youthGenderLabels: { male: "Knaben", female: "Mädchen" } },
   u18: { label: "U18", isYouth: true, isMixed: false, maxAge: 18, youthGenderLabels: { male: "Junioren", female: "Juniorinnen" } },
 };
-export type UserRole = "admin" | "user";
+export type UserRole = "admin" | "user" | "gastro";
 
 export interface Club {
   id: string;
@@ -202,4 +202,51 @@ export interface MatchLineup {
   created_at: string;
   // Joined
   player?: Player;
+}
+
+// ─── ESSENSZUSCHUSS ──────────────────────────────────────────────
+
+export type MealClaimStatus = "submitted" | "confirmed" | "settled";
+
+export const MEAL_CLAIM_STATUS_LABELS: Record<MealClaimStatus, string> = {
+  submitted: "Offen",
+  confirmed: "Bestätigt",
+  settled: "Abgerechnet",
+};
+
+export type BillingInterval = "monthly" | "quarterly" | "yearly" | "seasonal";
+
+export const BILLING_INTERVAL_LABELS: Record<BillingInterval, string> = {
+  monthly: "Monatlich",
+  quarterly: "Quartalsweise",
+  yearly: "Jährlich",
+  seasonal: "Benutzerdefinierter Zeitraum",
+};
+
+export interface MealClaim {
+  id: string;
+  club_id: string;
+  match_id: string;
+  captain_id: string;
+  meal_count: number;
+  amount_per_meal: number;
+  notes: string | null;
+  status: MealClaimStatus;
+  confirmed_at: string | null;
+  settled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  match?: Match & { team?: Team };
+  captain?: { first_name: string | null; last_name: string | null };
+}
+
+export interface MealSettings {
+  club_id: string;
+  amount_per_meal: number;
+  billing_interval: BillingInterval;
+  finance_email: string | null;
+  season_start: string | null;
+  season_end: string | null;
+  updated_at: string;
 }
