@@ -1,0 +1,57 @@
+diff --git a/dist/index.js b/dist/index.js
+index 121015425c89f3a33c312a950bda6ccb29a03292..3a9514fa43ed58d17479b19cfa119127a176af0f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -63,8 +63,6 @@ __export(index_exports, {
+   Toolbar: () => Toolbar,
+   Tooltip: () => Tooltip,
+   VisuallyHidden: () => VisuallyHidden,
+-  unstable_OneTimePasswordField: () => unstable_OneTimePasswordField,
+-  unstable_PasswordToggleField: () => unstable_PasswordToggleField
+ });
+ module.exports = __toCommonJS(index_exports);
+ var AccessibleIcon = __toESM(require("@radix-ui/react-accessible-icon"));
+@@ -83,8 +81,7 @@ var HoverCard = __toESM(require("@radix-ui/react-hover-card"));
+ var Label = __toESM(require("@radix-ui/react-label"));
+ var Menubar = __toESM(require("@radix-ui/react-menubar"));
+ var NavigationMenu = __toESM(require("@radix-ui/react-navigation-menu"));
+-var unstable_OneTimePasswordField = __toESM(require("@radix-ui/react-one-time-password-field"));
+-var unstable_PasswordToggleField = __toESM(require("@radix-ui/react-password-toggle-field"));
++
+ var Popover = __toESM(require("@radix-ui/react-popover"));
+ var Portal = __toESM(require("@radix-ui/react-portal"));
+ var Progress = __toESM(require("@radix-ui/react-progress"));
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 3876813189154c6f020dc48809a07d5ed43558bc..c514ddfe714358616ef52af4fd5de4b4f04ddb1d 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -15,8 +15,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
+ import * as Label from "@radix-ui/react-label";
+ import * as Menubar from "@radix-ui/react-menubar";
+ import * as NavigationMenu from "@radix-ui/react-navigation-menu";
+-import * as unstable_OneTimePasswordField from "@radix-ui/react-one-time-password-field";
+-import * as unstable_PasswordToggleField from "@radix-ui/react-password-toggle-field";
++
+ import * as Popover from "@radix-ui/react-popover";
+ import * as Portal from "@radix-ui/react-portal";
+ import * as Progress from "@radix-ui/react-progress";
+@@ -68,7 +67,5 @@ export {
+   Toolbar,
+   Tooltip,
+   VisuallyHidden,
+-  unstable_OneTimePasswordField,
+-  unstable_PasswordToggleField
+ };
+ //# sourceMappingURL=index.mjs.map
+diff --git a/package.json b/package.json
+index 88ab6dbe057f620311b2b312945e34a4b913c2ca..5c1610195e0900feb8f5bd769736312ac4f19d3d 100644
+--- a/package.json
++++ b/package.json
+@@ -2,7 +2,6 @@
+   "name": "radix-ui",
+   "version": "1.4.3",
+   "license": "MIT",
+-  "source": "./src/index.ts",
+   "main": "./dist/index.js",
+   "module": "./dist/index.mjs",
+   "exports": {

@@ -24,6 +24,7 @@ interface UserMenuProps {
 const roleLabels: Record<UserRole, string> = {
   admin: "Admin",
   user: "Mitglied",
+  gastro: "Gastronomie",
 };
 
 export function UserMenu({ email, firstName, lastName, role, teams, hasMultipleClubs, clubSlug }: UserMenuProps) {

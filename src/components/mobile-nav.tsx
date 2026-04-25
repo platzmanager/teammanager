@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Users, List, Calendar, Menu, Upload, UserCog } from "lucide-react";
+import { Users, List, Calendar, Menu, Upload, UserCog, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -15,13 +15,14 @@ import {
 interface MobileNavProps {
   clubSlug: string;
   isAdmin: boolean;
+  isGastro: boolean;
   hasPlayers: boolean;
   firstGender: string;
 }
 
 const NAV_LINK = "flex items-center gap-3 px-4 py-3 text-sm font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary hover:bg-primary/5";
 
-export function MobileNav({ clubSlug, isAdmin, hasPlayers, firstGender }: MobileNavProps) {
+export function MobileNav({ clubSlug, isAdmin, isGastro, hasPlayers, firstGender }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -33,6 +34,9 @@ export function MobileNav({ clubSlug, isAdmin, hasPlayers, firstGender }: Mobile
   const moreItems = [
     ...(hasPlayers
       ? [{ href: `/${clubSlug}/players/${firstGender}/overview`, label: "Meldeliste", icon: List }]
+      : []),
+    ...(isGastro
+      ? [{ href: `/${clubSlug}/gastro`, label: "Essenszuschuss", icon: UtensilsCrossed }]
       : []),
     ...(isAdmin
       ? [
